@@ -24,6 +24,17 @@ It currently exposes three modes:
 pip install -e .
 ```
 
+## Conda Environment
+
+From the repository root:
+
+```bash
+conda env create -f environment.yml
+conda activate tapeseq
+```
+
+This installs the required packages and installs this repository in editable mode, so you can run `tapeseq` directly inside the conda environment.
+
 ## Commands
 
 ```bash
@@ -34,6 +45,12 @@ tapeseq repeat-analysis INPUT.fasta OUTPUT_DIR --repeats-fasta REPEATS.fasta
 # Optional cache controls
 tapeseq exploratory INPUT.fasta OUTPUT_DIR --cache-dir /path/to/cache
 tapeseq exploratory INPUT.fasta OUTPUT_DIR --rebuild-cache
+```
+
+Verify the environment with:
+
+```bash
+tapeseq --help
 ```
 
 ## Trimming CSV

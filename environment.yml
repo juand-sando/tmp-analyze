@@ -1,0 +1,12 @@
+name: tapeseq
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.24
+  - pandas>=2.0
+  - matplotlib>=3.7
+  - biopython>=1.81
+  - pip
+  - pip:
+      - -e .
