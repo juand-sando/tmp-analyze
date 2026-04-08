@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tapeseq"
+version = "0.1.0"
+description = "Sequence self-similarity, periodicity, and repeat analysis pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "biopython>=1.81",
+  "matplotlib>=3.7",
+  "numpy>=1.24",
+  "pandas>=2.0",
+]
+
+[project.scripts]
+tapeseq = "tapeseq.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

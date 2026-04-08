@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+import argparse
+
+from .models import AnalysisConfig
+
+
+def add_common_signal_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    include_write_svg: bool = True,
+) -> None:
+    parser.add_argument("input_fasta", help="FASTA of full sequences.")
+    parser.add_argument("output_dir", help="Output directory.")
+    parser.add_argument("-t", "--trimmings", dest="trimmings_csv", help="CSV with trimming rules.")
+    parser.add_argument("--signal-source", choices=["raw", "standardized"], default="raw")
+    parser.add_argument("--baseline-mode", choices=["none", "global_projection"], default="none")
+    parser.add_argument("--smooth-iters", dest="smooth_iterations", type=int, default=20)
+    if include_write_svg:
+        parser.add_argument("--write-svg", action="store_true")
+    parser.add_argument("--num-shuffles", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=42)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="tapeseq sequence analysis toolkit.")
+    subparsers = parser.add_subparsers(dest="mode", required=True)
+
+    exploratory = subparsers.add_parser(
+        "exploratory",
+        help="Write raw and smoothed heatmaps plus projections for each accession.",
+    )
+    add_common_signal_arguments(exploratory)
+
+    periodicity = subparsers.add_parser(
+        "periodicity",
+        help="Run Fourier analysis on trimmed sequences and write a periodicity summary.",
+    )
+    add_common_signal_arguments(periodicity)
+    periodicity._option_string_actions["-t"].required = True
+    periodicity._option_string_actions["--trimmings"].required = True
+    periodicity.add_argument("--fft-min", type=int, default=3)
+    periodicity.add_argument("--fft-max", type=int, default=19)
+
+    repeat_analysis = subparsers.add_parser(
+        "repeat-analysis",
+        help="Score supplied repeats against the full-sequence projection.",
+    )
+    add_common_signal_arguments(repeat_analysis, include_write_svg=False)
+    repeat_analysis.add_argument(
+        "-r",
+        "--repeats-fasta",
+        dest="repeats_fasta",
+        help="FASTA of supplied repeats.",
+        required=True,
+    )
+    repeat_analysis.add_argument("--min-repeat-len", dest="min_repeat_length", type=int, default=5)
+    repeat_analysis.add_argument("--exact-only", action="store_true")
+
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> AnalysisConfig:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    config = AnalysisConfig(
+        mode=args.mode,
+        input_fasta=args.input_fasta,
+        output_dir=args.output_dir,
+        trimmings_csv=getattr(args, "trimmings_csv", None),
+        repeats_fasta=getattr(args, "repeats_fasta", None),
+        signal_source=getattr(args, "signal_source", "raw"),
+        baseline_mode=getattr(args, "baseline_mode", "none"),
+        smooth_iterations=getattr(args, "smooth_iterations", 20),
+        fft_min=getattr(args, "fft_min", 3),
+        fft_max=getattr(args, "fft_max", 19),
+        min_repeat_length=getattr(args, "min_repeat_length", 5),
+        exact_only=getattr(args, "exact_only", False),
+        write_svg=getattr(args, "write_svg", False),
+        num_shuffles=getattr(args, "num_shuffles", 1),
+        seed=getattr(args, "seed", 42),
+    )
+    validate_config(config)
+    return config
+
+
+def validate_config(config: AnalysisConfig) -> None:
+    if config.mode == "periodicity" and config.trimmings_csv is None:
+        raise SystemExit("ERROR: periodicity mode requires --trimmings.")
+
+    if config.mode == "repeat-analysis" and config.repeats_fasta is None:
+        raise SystemExit("ERROR: repeat-analysis requires --repeats-fasta.")
+
+    if config.signal_source == "standardized" and config.baseline_mode == "none":
+        raise SystemExit("ERROR: --signal-source standardized requires --baseline-mode global_projection.")
+
+    if config.num_shuffles < 1:
+        raise SystemExit("ERROR: --num-shuffles must be >= 1.")
+
+    if config.smooth_iterations < 0:
+        raise SystemExit("ERROR: --smooth-iters must be >= 0.")
+
+    if config.fft_min < 1 or config.fft_max < 1:
+        raise SystemExit("ERROR: --fft-min and --fft-max must be >= 1.")
+
+    if config.fft_max < config.fft_min:
+        raise SystemExit("ERROR: --fft-max must be >= --fft-min.")
+
+    if config.min_repeat_length < 1:
+        raise SystemExit("ERROR: --min-repeat-len must be >= 1.")
