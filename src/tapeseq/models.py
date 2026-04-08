@@ -13,6 +13,7 @@ class AnalysisConfig:
     mode: str
     input_fasta: Path
     output_dir: Path
+    cache_dir: Path
     trimmings_csv: Path | None = None
     repeats_fasta: Path | None = None
     smooth_iterations: int = 20
@@ -23,6 +24,7 @@ class AnalysisConfig:
     write_svg: bool = False
     num_shuffles: int = 1
     seed: int = 42
+    rebuild_cache: bool = False
 
 
 @dataclass

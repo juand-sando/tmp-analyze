@@ -6,6 +6,7 @@ from functools import lru_cache
 
 import numpy as np
 
+from .cache import load_cached_full_sequence_signal, save_cached_full_sequence_signal
 from .models import AnalysisConfig, SequenceSignal
 from .parsing import trimming_bounds
 
@@ -134,6 +135,31 @@ def build_full_sequence_signal(accession: str, full_sequence: str, config: Analy
         baseline_mean,
         baseline_std,
     )
+
+    return signal
+
+
+def build_or_load_full_sequence_signal(accession: str, full_sequence: str, config: AnalysisConfig) -> SequenceSignal:
+    need_raw_matrix = config.mode == "exploratory"
+    need_smoothed_matrix = config.mode in {"exploratory", "periodicity"}
+
+    cached_signal = load_cached_full_sequence_signal(
+        accession,
+        full_sequence,
+        config,
+        need_raw_matrix=need_raw_matrix,
+        need_smoothed_matrix=need_smoothed_matrix,
+    )
+    if cached_signal is not None:
+        return cached_signal
+
+    signal = build_full_sequence_signal(accession, full_sequence, config)
+    save_cached_full_sequence_signal(signal, config)
+
+    if not need_raw_matrix:
+        signal.raw_matrix_full = None
+    if not need_smoothed_matrix:
+        signal.smoothed_matrix_full = None
 
     return signal
 

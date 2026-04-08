@@ -9,7 +9,7 @@ from .outputs import (
     write_supplied_repeat_summary,
 )
 from .parsing import load_full_sequences, load_supplied_repeats, load_trimmings
-from .signal import add_trimmed_signal, build_full_sequence_signal, choose_projection
+from .signal import add_trimmed_signal, build_or_load_full_sequence_signal, choose_projection
 
 
 def find_repeat_range_exact(full_sequence: str, repeat_sequence: str) -> tuple[int, int] | None:
@@ -139,7 +139,7 @@ def run(config: AnalysisConfig) -> None:
     signals_by_accession: dict[str, SequenceSignal] = {}
     for accession, full_sequence in sequences_by_accession.items():
         print(f"Processing accession {accession}")
-        signal = build_full_sequence_signal(accession, full_sequence, config)
+        signal = build_or_load_full_sequence_signal(accession, full_sequence, config)
         if trimming_map is not None:
             signal = add_trimmed_signal(signal, trimming_map, config)
         signals_by_accession[accession] = signal

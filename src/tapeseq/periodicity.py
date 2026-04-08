@@ -15,7 +15,7 @@ from .outputs import (
 )
 from .parsing import load_full_sequences, load_trimmings
 from .plotting import save_fft_plot, save_projection_plot
-from .signal import add_trimmed_signal, build_full_sequence_signal, choose_projection
+from .signal import add_trimmed_signal, build_or_load_full_sequence_signal, choose_projection
 
 
 def fft_power_and_peak(signal: np.ndarray, minimum_frequency: int, maximum_frequency: int) -> tuple[np.ndarray, int, float]:
@@ -147,7 +147,7 @@ def run(config: AnalysisConfig) -> None:
 
     for accession, full_sequence in sequences_by_accession.items():
         print(f"Processing accession {accession}")
-        signal = build_full_sequence_signal(accession, full_sequence, config)
+        signal = build_or_load_full_sequence_signal(accession, full_sequence, config)
         if trimming_map is not None:
             signal = add_trimmed_signal(signal, trimming_map, config)
         signals_by_accession[accession] = signal

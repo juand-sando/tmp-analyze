@@ -13,6 +13,8 @@ def add_common_signal_arguments(
     parser.add_argument("input_fasta", help="FASTA of full sequences.")
     parser.add_argument("output_dir", help="Output directory.")
     parser.add_argument("-t", "--trimmings", dest="trimmings_csv", help="CSV with trimming rules.")
+    parser.add_argument("--cache-dir", default=".tapeseq_cache", help="Directory for reusable cached analysis artifacts.")
+    parser.add_argument("--rebuild-cache", action="store_true", help="Ignore cached artifacts and rebuild them.")
     parser.add_argument("--smooth-iters", dest="smooth_iterations", type=int, default=20)
     if include_write_svg:
         parser.add_argument("--write-svg", action="store_true")
@@ -65,6 +67,7 @@ def parse_args(argv: list[str] | None = None) -> AnalysisConfig:
         mode=args.mode,
         input_fasta=args.input_fasta,
         output_dir=args.output_dir,
+        cache_dir=args.cache_dir,
         trimmings_csv=getattr(args, "trimmings_csv", None),
         repeats_fasta=getattr(args, "repeats_fasta", None),
         smooth_iterations=getattr(args, "smooth_iterations", 20),
@@ -75,6 +78,7 @@ def parse_args(argv: list[str] | None = None) -> AnalysisConfig:
         write_svg=getattr(args, "write_svg", False),
         num_shuffles=getattr(args, "num_shuffles", 1),
         seed=getattr(args, "seed", 42),
+        rebuild_cache=getattr(args, "rebuild_cache", False),
     )
     validate_config(config)
     return config
