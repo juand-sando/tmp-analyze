@@ -39,14 +39,14 @@ This installs the required packages and installs this repository in editable mod
 ## Commands
 
 ```bash
-tapeseq exploratory INPUT.fasta OUTPUT_DIR --trimmings TRIMS.csv
-tapeseq periodicity INPUT.fasta OUTPUT_DIR --trimmings TRIMS.csv
-tapeseq repeat-analysis INPUT.fasta OUTPUT_DIR --repeats-fasta REPEATS.fasta
-tapeseq map-domain ALIGNMENT.fasta OUTPUT_DIR --reference-accession REF_ACC --reference-domain DOMAIN.fasta
+tapeseq exploratory -i INPUT.fasta -o OUTPUT_DIR --trimmings TRIMS.csv
+tapeseq periodicity -i INPUT.fasta -o OUTPUT_DIR --trimmings TRIMS.csv
+tapeseq repeat-analysis -i INPUT.fasta -o OUTPUT_DIR --repeats-fasta REPEATS.fasta
+tapeseq map-domain -a ALIGNMENT.fasta -o OUTPUT_DIR --reference-accession REF_ACC --reference-domain DOMAIN.fasta
 
 # Optional cache controls
-tapeseq exploratory INPUT.fasta OUTPUT_DIR --cache-dir /path/to/cache
-tapeseq exploratory INPUT.fasta OUTPUT_DIR --rebuild-cache
+tapeseq exploratory -i INPUT.fasta -o OUTPUT_DIR --cache-dir /path/to/cache
+tapeseq exploratory -i INPUT.fasta -o OUTPUT_DIR --rebuild-cache
 ```
 
 Verify the environment with:

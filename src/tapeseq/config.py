@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from .models import AnalysisConfig
 
@@ -8,14 +9,35 @@ from .models import AnalysisConfig
 FORMATTER_CLASS = argparse.ArgumentDefaultsHelpFormatter
 
 
+def add_named_input_output_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    input_flag: tuple[str, str],
+    input_help: str,
+    input_metavar: str,
+    output_help: str = "Output directory.",
+) -> None:
+    parser.add_argument(*input_flag, dest="input_fasta_flag", metavar=input_metavar, help=input_help)
+    parser.add_argument("-o", "--output-dir", dest="output_dir_flag", metavar="OUTPUT_DIR", help=output_help)
+    parser.add_argument("legacy_input_fasta", nargs="?", help=argparse.SUPPRESS)
+    parser.add_argument("legacy_output_dir", nargs="?", help=argparse.SUPPRESS)
+
+
 def add_common_signal_arguments(
     parser: argparse.ArgumentParser,
     *,
+    input_flag: tuple[str, str] = ("-i", "--input-fasta"),
+    input_help: str = "FASTA of full sequences.",
     include_trimmings: bool = True,
     include_write_svg: bool = True,
 ) -> None:
-    parser.add_argument("input_fasta", help="FASTA of full sequences.")
-    parser.add_argument("output_dir", help="Output directory.")
+    add_named_input_output_arguments(
+        parser,
+        input_flag=input_flag,
+        input_help=input_help,
+        input_metavar="INPUT_FASTA",
+        output_help="Output directory.",
+    )
     if include_trimmings:
         parser.add_argument(
             "-t",
@@ -124,8 +146,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Project a reference domain through an alignment and generate accession-based trimming rules.",
         formatter_class=FORMATTER_CLASS,
     )
-    map_domain.add_argument("input_fasta", help="FASTA of aligned sequences.")
-    map_domain.add_argument("output_dir", help="Output directory.")
+    add_named_input_output_arguments(
+        map_domain,
+        input_flag=("-a", "--alignment-fasta"),
+        input_help="FASTA of aligned sequences.",
+        input_metavar="ALIGNMENT_FASTA",
+        output_help="Output directory.",
+    )
     map_domain.add_argument(
         "--reference-accession",
         required=True,
@@ -141,13 +168,48 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def warn_legacy_positionals(mode: str) -> None:
+    print(
+        f"WARNING: positional input/output arguments for '{mode}' are deprecated; "
+        "use explicit flags such as --input-fasta/--output-dir (or --alignment-fasta/--output-dir for map-domain).",
+        file=sys.stderr,
+    )
+
+
+def resolve_input_output_args(parser: argparse.ArgumentParser, args) -> tuple[str, str]:
+    named_input = getattr(args, "input_fasta_flag", None)
+    named_output = getattr(args, "output_dir_flag", None)
+    legacy_input = getattr(args, "legacy_input_fasta", None)
+    legacy_output = getattr(args, "legacy_output_dir", None)
+
+    if named_input is not None and legacy_input is not None:
+        parser.error("provide either the named input flag or the legacy positional input, not both.")
+    if named_output is not None and legacy_output is not None:
+        parser.error("provide either --output-dir or the legacy positional output, not both.")
+
+    input_value = named_input if named_input is not None else legacy_input
+    output_value = named_output if named_output is not None else legacy_output
+
+    if input_value is None or output_value is None:
+        expected_input_flag = "--alignment-fasta" if args.mode == "map-domain" else "--input-fasta"
+        parser.error(
+            f"the following arguments are required: {expected_input_flag}, --output-dir"
+        )
+
+    if legacy_input is not None or legacy_output is not None:
+        warn_legacy_positionals(args.mode)
+
+    return input_value, output_value
+
+
 def parse_args(argv: list[str] | None = None) -> AnalysisConfig:
     parser = build_parser()
     args = parser.parse_args(argv)
+    input_fasta, output_dir = resolve_input_output_args(parser, args)
     config = AnalysisConfig(
         mode=args.mode,
-        input_fasta=args.input_fasta,
-        output_dir=args.output_dir,
+        input_fasta=input_fasta,
+        output_dir=output_dir,
         cache_dir=getattr(args, "cache_dir", ".tapeseq_cache"),
         trimmings_csv=getattr(args, "trimmings_csv", None),
         repeats_fasta=getattr(args, "repeats_fasta", None),
