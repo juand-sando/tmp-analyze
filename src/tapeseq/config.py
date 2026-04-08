@@ -34,11 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     periodicity = subparsers.add_parser(
         "periodicity",
-        help="Run Fourier analysis on trimmed sequences and write a periodicity summary.",
+        help="Run Fourier analysis on the focused sequence window and write a periodicity summary.",
     )
     add_common_signal_arguments(periodicity)
-    periodicity._option_string_actions["-t"].required = True
-    periodicity._option_string_actions["--trimmings"].required = True
     periodicity.add_argument("--fft-min", type=int, default=3)
     periodicity.add_argument("--fft-max", type=int, default=19)
 
@@ -85,9 +83,6 @@ def parse_args(argv: list[str] | None = None) -> AnalysisConfig:
 
 
 def validate_config(config: AnalysisConfig) -> None:
-    if config.mode == "periodicity" and config.trimmings_csv is None:
-        raise SystemExit("ERROR: periodicity mode requires --trimmings.")
-
     if config.mode == "repeat-analysis" and config.repeats_fasta is None:
         raise SystemExit("ERROR: repeat-analysis requires --repeats-fasta.")
 

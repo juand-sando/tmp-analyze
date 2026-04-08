@@ -1,0 +1,17 @@
+{
+  "mode": "periodicity",
+  "input_fasta": "dummy.fasta",
+  "output_dir": "out",
+  "cache_dir": ".tapeseq_cache",
+  "trimmings_csv": null,
+  "repeats_fasta": null,
+  "smooth_iterations": 20,
+  "fft_min": 3,
+  "fft_max": 19,
+  "min_repeat_length": 5,
+  "exact_only": false,
+  "write_svg": false,
+  "num_shuffles": 1,
+  "seed": 42,
+  "rebuild_cache": false
+}

@@ -119,6 +119,31 @@ def write_periodicity_summary(
             writer.writerow(row)
 
 
+def write_global_periodicity_segments_fasta(results: list[PeriodicityResult], output_dir: Path) -> int:
+    if not results:
+        return 0
+
+    output_directory = global_periodicity_dir(output_dir)
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    record_count = 0
+    with (output_directory / "putative_repeats_all.fasta").open("w", encoding="utf-8") as handle:
+        for result in results:
+            for repeat_index, repeat_sequence in enumerate(result.repeat_sequences, start=1):
+                suffix = f"R{repeat_index}" if repeat_index < len(result.repeat_sequences) else "RF"
+                write_wrapped_fasta_record(handle, f"{result.accession}_{suffix}", repeat_sequence)
+                record_count += 1
+
+    return record_count
+
+
+def write_periodicity_notice(output_dir: Path, message: str) -> None:
+    output_directory = global_periodicity_dir(output_dir)
+    output_directory.mkdir(parents=True, exist_ok=True)
+    with (output_directory / "putative_repeats_notice.txt").open("w", encoding="utf-8") as handle:
+        handle.write(message.rstrip() + "\n")
+
+
 def write_per_accession_repeat_window_scores(repeat_scores: list[SuppliedRepeatScore], config: AnalysisConfig) -> None:
     import pandas as pd
 
