@@ -18,6 +18,7 @@ from .outputs import (
 )
 from .parsing import load_full_sequences, load_trimmings
 from .plotting import save_fft_plot, save_projection_plot
+from .run_logging import get_logger, log_file_write
 from .signal import add_trimmed_signal, build_or_load_full_sequence_signal, choose_projection
 
 
@@ -106,9 +107,12 @@ def write_periodicity_outputs(signal: SequenceSignal, result: PeriodicityResult,
     analysis_sequence = signal.trimmed_sequence if use_trimmed else signal.full_sequence
     analysis_matrix = signal.smoothed_matrix_trimmed if use_trimmed else signal.smoothed_matrix_full
     analysis_label = "trimmed" if use_trimmed else "full"
+    residue_start = signal.trimming_start_index if use_trimmed and signal.trimming_start_index is not None else 0
 
     if use_trimmed:
-        with (output_directory / f"{signal.accession}_trimmed.fasta").open("w", encoding="utf-8") as handle:
+        trimmed_fasta_path = output_directory / f"{signal.accession}_trimmed.fasta"
+        log_file_write(trimmed_fasta_path)
+        with trimmed_fasta_path.open("w", encoding="utf-8") as handle:
             write_wrapped_fasta_record(handle, signal.accession, signal.trimmed_sequence)
 
     if analysis_matrix is not None and analysis_sequence is not None:
@@ -124,6 +128,7 @@ def write_periodicity_outputs(signal: SequenceSignal, result: PeriodicityResult,
             projection,
             f"{signal.accession} {analysis_label} standardized projection",
             output_directory / f"{signal.accession}_projection.png",
+            start_position=residue_start,
         )
         power_spectrum, _, _ = fft_power_and_peak(
             projection,
@@ -139,7 +144,9 @@ def write_periodicity_outputs(signal: SequenceSignal, result: PeriodicityResult,
             highlight_frequency=result.best_frequency,
         )
 
-    with (output_directory / f"{signal.accession}_periodicity_segments.fasta").open("w", encoding="utf-8") as handle:
+    segments_path = output_directory / f"{signal.accession}_periodicity_segments.fasta"
+    log_file_write(segments_path)
+    with segments_path.open("w", encoding="utf-8") as handle:
         for repeat_index, repeat_sequence in enumerate(result.repeat_sequences, start=1):
             suffix = f"R{repeat_index}" if repeat_index < len(result.repeat_sequences) else "RF"
             write_wrapped_fasta_record(handle, f"{signal.accession}_{suffix}", repeat_sequence)
@@ -161,6 +168,9 @@ def emit_periodicity_warnings(results: list[PeriodicityResult]) -> int:
             print(
                 f"WARNING: accession {result.accession} has a non-finite inferred period; putative repeats may be unreliable.",
                 file=sys.stderr,
+            )
+            get_logger().warning(
+                f"warning: accession {result.accession} has a non-finite inferred period; putative repeats may be unreliable."
             )
         return len(results)
 
@@ -185,12 +195,12 @@ def emit_periodicity_warnings(results: list[PeriodicityResult]) -> int:
             warning_count += len(warnings_for_result)
             for warning_text in warnings_for_result:
                 print(f"WARNING: accession {result.accession}: {warning_text}.", file=sys.stderr)
+                get_logger().warning(f"warning: accession {result.accession}: {warning_text}.")
 
     return warning_count
 
 
-def run(config: AnalysisConfig) -> None:
-    config.output_dir.mkdir(parents=True, exist_ok=True)
+def run(config: AnalysisConfig) -> str:
     write_analysis_metadata(config)
 
     sequences_by_accession = load_full_sequences(config.input_fasta)
@@ -223,9 +233,12 @@ def run(config: AnalysisConfig) -> None:
     )
     write_periodicity_notice(config.output_dir, notice_message)
     print(notice_message, file=sys.stderr)
+    get_logger().warning(f"notice: {notice_message}")
 
-    print(
+    summary = (
         f"Done. Processed {len(signals_by_accession)} accession(s); "
         f"trimmed {trimmed_written}; periodicity results for {len(results)} accession(s); "
         f"wrote {global_repeat_records} putative repeat record(s); emitted {warning_count} warning(s)."
     )
+    print(summary)
+    return summary

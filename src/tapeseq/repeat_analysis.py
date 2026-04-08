@@ -128,8 +128,7 @@ def score_supplied_repeats(
     return scored_repeats
 
 
-def run(config: AnalysisConfig) -> None:
-    config.output_dir.mkdir(parents=True, exist_ok=True)
+def run(config: AnalysisConfig) -> str:
     write_analysis_metadata(config)
 
     sequences_by_accession = load_full_sequences(config.input_fasta)
@@ -148,7 +147,9 @@ def run(config: AnalysisConfig) -> None:
     write_per_accession_repeat_window_scores(repeat_scores, config)
     write_supplied_repeat_summary(repeat_scores, config)
 
-    print(
+    summary = (
         f"Done. Processed {len(signals_by_accession)} accession(s); "
         f"scored {len(repeat_scores)} supplied repeat record(s)."
     )
+    print(summary)
+    return summary

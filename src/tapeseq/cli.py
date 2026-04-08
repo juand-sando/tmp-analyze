@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .config import parse_args
+from .run_logging import finalize_run_logging, setup_run_logging, write_output_inventory
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -15,6 +16,9 @@ def main(argv: list[str] | None = None) -> None:
     if config.repeats_fasta is not None:
         config.repeats_fasta = Path(config.repeats_fasta)
 
+    config.output_dir.mkdir(parents=True, exist_ok=True)
+    setup_run_logging(config)
+
     if config.mode == "exploratory":
         from .exploratory import run
     elif config.mode == "periodicity":
@@ -24,4 +28,15 @@ def main(argv: list[str] | None = None) -> None:
     else:
         raise SystemExit(f"ERROR: unsupported mode {config.mode}")
 
-    run(config)
+    summary = "run failed"
+    try:
+        summary = run(config)
+        return
+    except Exception as exc:
+        from .run_logging import get_logger
+
+        get_logger().exception(f"error: run failed with exception: {exc}")
+        raise
+    finally:
+        write_output_inventory(config.output_dir)
+        finalize_run_logging(summary or "run completed")

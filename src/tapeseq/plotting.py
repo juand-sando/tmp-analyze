@@ -4,6 +4,8 @@ from pathlib import Path
 
 import numpy as np
 
+from .run_logging import log_file_write
+
 
 def _configure_matplotlib():
     import matplotlib as mpl
@@ -13,27 +15,41 @@ def _configure_matplotlib():
     return plt
 
 
-def save_heatmap(matrix: np.ndarray, title: str, out_path: Path) -> None:
+def save_heatmap(matrix: np.ndarray, title: str, out_path: Path, start_position: int = 0) -> None:
     plt = _configure_matplotlib()
+    end_position = start_position + matrix.shape[0]
     plt.figure()
-    plt.imshow(matrix, aspect="auto")
+    plt.imshow(
+        matrix,
+        aspect="auto",
+        origin="upper",
+        extent=(
+            start_position - 0.5,
+            end_position - 0.5,
+            end_position - 0.5,
+            start_position - 0.5,
+        ),
+    )
     plt.title(title)
-    plt.xlabel("Position")
-    plt.ylabel("Position")
+    plt.xlabel("Residue position")
+    plt.ylabel("Residue position")
     plt.colorbar(label="Score")
     plt.tight_layout()
+    log_file_write(out_path)
     plt.savefig(out_path)
     plt.close()
 
 
-def save_projection_plot(signal: np.ndarray, title: str, out_path: Path) -> None:
+def save_projection_plot(signal: np.ndarray, title: str, out_path: Path, start_position: int = 0) -> None:
     plt = _configure_matplotlib()
+    x_values = np.arange(start_position, start_position + len(signal))
     plt.figure()
-    plt.plot(signal)
+    plt.plot(x_values, signal)
     plt.title(title)
-    plt.xlabel("Position")
+    plt.xlabel("Residue position")
     plt.ylabel("Signal")
     plt.tight_layout()
+    log_file_write(out_path)
     plt.savefig(out_path)
     plt.close()
 
@@ -60,5 +76,6 @@ def save_fft_plot(
     plt.xlabel("Frequency index")
     plt.ylabel("Power")
     plt.tight_layout()
+    log_file_write(out_path)
     plt.savefig(out_path)
     plt.close()

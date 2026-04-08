@@ -8,7 +8,7 @@ import numpy as np
 
 from .cache import load_cached_full_sequence_signal, save_cached_full_sequence_signal
 from .models import AnalysisConfig, SequenceSignal
-from .parsing import trimming_bounds
+from .parsing import TrimmingRules, trimming_bounds
 
 
 @lru_cache(maxsize=1)
@@ -166,10 +166,10 @@ def build_or_load_full_sequence_signal(accession: str, full_sequence: str, confi
 
 def add_trimmed_signal(
     signal: SequenceSignal,
-    trim_map: dict[int, tuple[int, int]],
+    trim_map: TrimmingRules,
     config: AnalysisConfig,
 ) -> SequenceSignal:
-    bounds = trimming_bounds(len(signal.full_sequence), trim_map)
+    bounds = trimming_bounds(signal.accession, len(signal.full_sequence), trim_map)
     if bounds is None:
         return signal
 

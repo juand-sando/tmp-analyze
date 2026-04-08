@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from .models import AnalysisConfig, PeriodicityResult, SequenceSignal, SuppliedRepeatScore
+from .run_logging import log_file_write
 
 
 def per_accession_base_dir(output_dir: Path, accession: str) -> Path:
@@ -52,7 +53,9 @@ def write_analysis_metadata(config: AnalysisConfig) -> None:
         for key, value in config_dict.items()
     }
 
-    with (metadata_directory / "analysis_parameters.json").open("w", encoding="utf-8") as handle:
+    metadata_path = metadata_directory / "analysis_parameters.json"
+    log_file_write(metadata_path, category="metadata")
+    with metadata_path.open("w", encoding="utf-8") as handle:
         json.dump(serializable_config, handle, indent=2)
 
 
@@ -70,7 +73,9 @@ def write_trimmed_sequences_fasta(signals_by_accession: dict[str, SequenceSignal
     output_directory = global_outputs_dir(output_dir)
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    with (output_directory / "trimmed_sequences.fasta").open("w", encoding="utf-8") as handle:
+    output_path = output_directory / "trimmed_sequences.fasta"
+    log_file_write(output_path)
+    with output_path.open("w", encoding="utf-8") as handle:
         for signal in trimmed_signals:
             write_wrapped_fasta_record(handle, signal.accession, signal.trimmed_sequence or "")
 
@@ -79,6 +84,7 @@ def write_trimmed_sequences_fasta(signals_by_accession: dict[str, SequenceSignal
 
 def write_matrix_csv(matrix: np.ndarray, sequence: str, out_csv: Path) -> None:
     out_csv.parent.mkdir(parents=True, exist_ok=True)
+    log_file_write(out_csv)
     with out_csv.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow([""] + list(sequence))
@@ -98,6 +104,7 @@ def write_periodicity_summary(
     output_directory.mkdir(parents=True, exist_ok=True)
 
     summary_path = output_directory / "results_summary.csv"
+    log_file_write(summary_path)
     with summary_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         headers = ["accession", "trimmed_length", "max_frequency", "max_power", "period", "repeat_count"]
@@ -127,7 +134,9 @@ def write_global_periodicity_segments_fasta(results: list[PeriodicityResult], ou
     output_directory.mkdir(parents=True, exist_ok=True)
 
     record_count = 0
-    with (output_directory / "putative_repeats_all.fasta").open("w", encoding="utf-8") as handle:
+    output_path = output_directory / "putative_repeats_all.fasta"
+    log_file_write(output_path)
+    with output_path.open("w", encoding="utf-8") as handle:
         for result in results:
             for repeat_index, repeat_sequence in enumerate(result.repeat_sequences, start=1):
                 suffix = f"R{repeat_index}" if repeat_index < len(result.repeat_sequences) else "RF"
@@ -140,7 +149,9 @@ def write_global_periodicity_segments_fasta(results: list[PeriodicityResult], ou
 def write_periodicity_notice(output_dir: Path, message: str) -> None:
     output_directory = global_periodicity_dir(output_dir)
     output_directory.mkdir(parents=True, exist_ok=True)
-    with (output_directory / "putative_repeats_notice.txt").open("w", encoding="utf-8") as handle:
+    output_path = output_directory / "putative_repeats_notice.txt"
+    log_file_write(output_path)
+    with output_path.open("w", encoding="utf-8") as handle:
         handle.write(message.rstrip() + "\n")
 
 
@@ -156,6 +167,7 @@ def write_per_accession_repeat_window_scores(repeat_scores: list[SuppliedRepeatS
         output_directory.mkdir(parents=True, exist_ok=True)
         output_path = output_directory / f"{accession}_repeat_window_scores.csv"
 
+        log_file_write(output_path)
         with output_path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.writer(handle)
             writer.writerow([
@@ -245,4 +257,6 @@ def write_supplied_repeat_summary(repeat_scores: list[SuppliedRepeatScore], conf
     output_directory.mkdir(parents=True, exist_ok=True)
 
     summary_table = build_supplied_repeat_wide_table(repeat_scores)
-    summary_table.to_csv(output_directory / "supplied_repeat_scores_summary.csv", index=False)
+    output_path = output_directory / "supplied_repeat_scores_summary.csv"
+    log_file_write(output_path)
+    summary_table.to_csv(output_path, index=False)

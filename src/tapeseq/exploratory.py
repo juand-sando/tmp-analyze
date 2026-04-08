@@ -11,6 +11,7 @@ from .outputs import (
 )
 from .parsing import load_full_sequences, load_trimmings
 from .plotting import save_heatmap, save_projection_plot
+from .run_logging import get_logger, log_file_write
 from .signal import add_trimmed_signal, build_or_load_full_sequence_signal, choose_projection
 
 
@@ -21,8 +22,11 @@ def write_exploratory_outputs(signal: SequenceSignal, config: AnalysisConfig) ->
     if config.trimmings_csv is not None:
         if signal.trimmed_sequence is None:
             return
+        trim_start = signal.trimming_start_index or 0
 
-        with (output_directory / f"{signal.accession}_trimmed.fasta").open("w", encoding="utf-8") as handle:
+        trimmed_fasta_path = output_directory / f"{signal.accession}_trimmed.fasta"
+        log_file_write(trimmed_fasta_path)
+        with trimmed_fasta_path.open("w", encoding="utf-8") as handle:
             write_wrapped_fasta_record(handle, signal.accession, signal.trimmed_sequence)
 
         if signal.raw_matrix_trimmed is not None:
@@ -30,6 +34,7 @@ def write_exploratory_outputs(signal: SequenceSignal, config: AnalysisConfig) ->
                 signal.raw_matrix_trimmed,
                 f"{signal.accession} raw matrix (trimmed)",
                 output_directory / f"{signal.accession}_trimmed_raw.png",
+                start_position=trim_start,
             )
 
         if signal.smoothed_matrix_trimmed is not None:
@@ -37,12 +42,14 @@ def write_exploratory_outputs(signal: SequenceSignal, config: AnalysisConfig) ->
                 signal.smoothed_matrix_trimmed,
                 f"{signal.accession} smoothed matrix (trimmed)",
                 output_directory / f"{signal.accession}_trimmed_smooth.png",
+                start_position=trim_start,
             )
             if config.write_svg:
                 save_heatmap(
                     signal.smoothed_matrix_trimmed,
                     f"{signal.accession} smoothed matrix (trimmed)",
                     output_directory / f"{signal.accession}_trimmed_smooth.svg",
+                    start_position=trim_start,
                 )
 
         trimmed_projection = choose_projection(signal, use_trimmed=True)
@@ -51,6 +58,7 @@ def write_exploratory_outputs(signal: SequenceSignal, config: AnalysisConfig) ->
                 trimmed_projection,
                 f"{signal.accession} trimmed standardized projection",
                 output_directory / f"{signal.accession}_trimmed_projection.png",
+                start_position=trim_start,
             )
         return
 
@@ -59,6 +67,7 @@ def write_exploratory_outputs(signal: SequenceSignal, config: AnalysisConfig) ->
             signal.raw_matrix_full,
             f"{signal.accession} raw matrix (full)",
             output_directory / f"{signal.accession}_full_raw.png",
+            start_position=0,
         )
 
     if signal.smoothed_matrix_full is not None:
@@ -66,12 +75,14 @@ def write_exploratory_outputs(signal: SequenceSignal, config: AnalysisConfig) ->
             signal.smoothed_matrix_full,
             f"{signal.accession} smoothed matrix (full)",
             output_directory / f"{signal.accession}_full_smooth.png",
+            start_position=0,
         )
         if config.write_svg:
             save_heatmap(
                 signal.smoothed_matrix_full,
                 f"{signal.accession} smoothed matrix (full)",
                 output_directory / f"{signal.accession}_full_smooth.svg",
+                start_position=0,
             )
 
     full_projection = choose_projection(signal, use_trimmed=False)
@@ -80,11 +91,11 @@ def write_exploratory_outputs(signal: SequenceSignal, config: AnalysisConfig) ->
             full_projection,
             f"{signal.accession} full standardized projection",
             output_directory / f"{signal.accession}_full_projection.png",
+            start_position=0,
         )
 
 
-def run(config: AnalysisConfig) -> None:
-    config.output_dir.mkdir(parents=True, exist_ok=True)
+def run(config: AnalysisConfig) -> str:
     write_analysis_metadata(config)
 
     sequences_by_accession = load_full_sequences(config.input_fasta)
@@ -104,14 +115,19 @@ def run(config: AnalysisConfig) -> None:
                 f"WARNING: no valid trimming found for accession {accession}; skipping exploratory outputs.",
                 file=sys.stderr,
             )
+            get_logger().warning(
+                f"warning: no valid trimming found for accession {accession}; skipping exploratory outputs."
+            )
         write_exploratory_outputs(signal, config)
 
     trimmed_written = 0
     if trimming_map is not None:
         trimmed_written = write_trimmed_sequences_fasta(signals_by_accession, config.output_dir)
 
-    print(
+    summary = (
         f"Done. Processed {len(signals_by_accession)} accession(s); "
         f"wrote trimmed sequences for {trimmed_written} accession(s); "
         f"skipped {skipped_without_trim} accession(s) without valid trims."
     )
+    print(summary)
+    return summary

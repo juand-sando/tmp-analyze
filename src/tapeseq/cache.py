@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from .models import AnalysisConfig, SequenceSignal
+from .run_logging import log_cache_event
 
 
 CACHE_VERSION = 1
@@ -57,20 +58,24 @@ def load_cached_full_sequence_signal(
     need_smoothed_matrix: bool,
 ) -> SequenceSignal | None:
     if config.rebuild_cache:
+        log_cache_event("skip", config.cache_dir, detail="rebuild requested")
         return None
 
     entry_dir = cache_entry_dir(config.cache_dir, accession, full_sequence)
     metadata_path = entry_dir / "metadata.json"
     if not metadata_path.exists():
+        log_cache_event("miss", entry_dir, detail="metadata missing")
         return None
 
     try:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     except Exception:
+        log_cache_event("miss", entry_dir, detail="metadata unreadable")
         return None
 
     expected = expected_cache_metadata(accession, full_sequence, config)
     if not metadata_matches(metadata, expected):
+        log_cache_event("miss", entry_dir, detail="metadata mismatch")
         return None
 
     required_files = [
@@ -83,6 +88,7 @@ def load_cached_full_sequence_signal(
         required_files.append(entry_dir / "smoothed_matrix_full.npy")
 
     if not all(path.exists() for path in required_files):
+        log_cache_event("miss", entry_dir, detail="required artifact missing")
         return None
 
     signal = SequenceSignal(accession=accession, full_sequence=full_sequence)
@@ -97,6 +103,7 @@ def load_cached_full_sequence_signal(
     if need_smoothed_matrix:
         signal.smoothed_matrix_full = np.load(entry_dir / "smoothed_matrix_full.npy").astype(float, copy=False)
 
+    log_cache_event("hit", entry_dir)
     return signal
 
 
@@ -113,6 +120,13 @@ def save_cached_full_sequence_signal(signal: SequenceSignal, config: AnalysisCon
 
     entry_dir = cache_entry_dir(config.cache_dir, signal.accession, signal.full_sequence)
     entry_dir.mkdir(parents=True, exist_ok=True)
+    overwrite = any((entry_dir / name).exists() for name in [
+        "raw_matrix_full.npy",
+        "smoothed_matrix_full.npy",
+        "projection_full_raw.npy",
+        "projection_full_standardized.npy",
+        "metadata.json",
+    ])
 
     np.save(entry_dir / "raw_matrix_full.npy", np.rint(signal.raw_matrix_full).astype(np.int16))
     np.save(entry_dir / "smoothed_matrix_full.npy", signal.smoothed_matrix_full.astype(np.float32))
@@ -125,3 +139,4 @@ def save_cached_full_sequence_signal(signal: SequenceSignal, config: AnalysisCon
 
     with (entry_dir / "metadata.json").open("w", encoding="utf-8") as handle:
         json.dump(metadata, handle, indent=2)
+    log_cache_event("overwrite" if overwrite else "write", entry_dir)

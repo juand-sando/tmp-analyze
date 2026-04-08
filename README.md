@@ -6,6 +6,12 @@ All downstream analysis uses a standardized full-sequence projection computed fr
 
 Full-sequence analysis artifacts are cached outside run outputs by default in `.tapeseq_cache/` so later modes can reuse them.
 
+Each run also writes metadata under `output_dir/run_metadata/`, including:
+
+- `analysis_parameters.json`
+- `run.log`
+- `current_state.json`
+
 It currently exposes three modes:
 
 - `exploratory`: write raw and smoothed heatmaps plus projection plots for each accession
@@ -29,6 +35,28 @@ tapeseq repeat-analysis INPUT.fasta OUTPUT_DIR --repeats-fasta REPEATS.fasta
 tapeseq exploratory INPUT.fasta OUTPUT_DIR --cache-dir /path/to/cache
 tapeseq exploratory INPUT.fasta OUTPUT_DIR --rebuild-cache
 ```
+
+## Trimming CSV
+
+The trimming CSV must contain `start` and `end`, plus either `tmp_length` or `accession`.
+
+Length-based rules:
+
+```csv
+tmp_length,start,end
+120,10,95
+150,20,130
+```
+
+Accession-based rules:
+
+```csv
+accession,start,end
+ACC001,10,95
+ACC002,20,130
+```
+
+Mixed files are also accepted. When both are present, accession-specific rules take precedence over length-based rules.
 
 You can also run the repository-local compatibility entrypoint:
 

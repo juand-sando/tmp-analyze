@@ -3,10 +3,17 @@ from __future__ import annotations
 import csv
 import re
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
 REPEAT_HEADER_PATTERN = re.compile(r"^(?P<accession>.+?)_R(?P<suffix>\d+|F)$")
+
+
+@dataclass
+class TrimmingRules:
+    by_length: dict[int, tuple[int, int]] = field(default_factory=dict)
+    by_accession: dict[str, tuple[int, int]] = field(default_factory=dict)
 
 
 def extract_accession(record) -> str:
@@ -68,8 +75,8 @@ def load_supplied_repeats(repeats_fasta: Path) -> list[tuple[str, str, str]]:
     return repeat_records
 
 
-def load_trimmings(csv_path: Path) -> dict[int, tuple[int, int]]:
-    trimming_map: dict[int, tuple[int, int]] = {}
+def load_trimmings(csv_path: Path) -> TrimmingRules:
+    trimming_rules = TrimmingRules()
     skipped_rows = 0
 
     with csv_path.open(newline="", encoding="utf-8-sig") as handle:
@@ -79,13 +86,14 @@ def load_trimmings(csv_path: Path) -> dict[int, tuple[int, int]]:
         normalized_headers = [header.lstrip("\ufeff").strip() for header in reader.fieldnames]
         reader.fieldnames = normalized_headers
 
-        required_columns = {"tmp_length", "start", "end"}
+        required_columns = {"start", "end"}
         if not required_columns.issubset(set(normalized_headers)):
             raise SystemExit(f"ERROR: {csv_path} must contain columns {sorted(required_columns)}.")
+        if "tmp_length" not in normalized_headers and "accession" not in normalized_headers:
+            raise SystemExit(f"ERROR: {csv_path} must contain either 'tmp_length' or 'accession' in addition to start/end.")
 
         for row in reader:
             try:
-                length_value = int((row["tmp_length"] or "").strip())
                 start_value = int((row["start"] or "").strip())
                 end_value = int((row["end"] or "").strip())
             except Exception:
@@ -96,22 +104,43 @@ def load_trimmings(csv_path: Path) -> dict[int, tuple[int, int]]:
                 skipped_rows += 1
                 continue
 
-            trimming_map[length_value] = (start_value, end_value)
+            row_applied = False
+
+            accession_value = (row.get("accession") or "").strip()
+            if accession_value:
+                trimming_rules.by_accession[accession_value] = (start_value, end_value)
+                row_applied = True
+
+            length_text = (row.get("tmp_length") or "").strip()
+            if length_text:
+                try:
+                    length_value = int(length_text)
+                except Exception:
+                    skipped_rows += 1
+                    continue
+                trimming_rules.by_length[length_value] = (start_value, end_value)
+                row_applied = True
+
+            if not row_applied:
+                skipped_rows += 1
 
     if skipped_rows:
         print(f"WARNING: skipped {skipped_rows} invalid trimming rows in {csv_path}.", file=sys.stderr)
 
-    if not trimming_map:
+    if not trimming_rules.by_length and not trimming_rules.by_accession:
         raise SystemExit(f"ERROR: no valid trimming rows found in {csv_path}.")
 
-    return trimming_map
+    return trimming_rules
 
 
-def trimming_bounds(full_length: int, trim_map: dict[int, tuple[int, int]]) -> tuple[int, int] | None:
-    if full_length not in trim_map:
+def trimming_bounds(accession: str, full_length: int, trimming_rules: TrimmingRules) -> tuple[int, int] | None:
+    bounds_spec = trimming_rules.by_accession.get(accession)
+    if bounds_spec is None:
+        bounds_spec = trimming_rules.by_length.get(full_length)
+    if bounds_spec is None:
         return None
 
-    start_1_based, end_specification = trim_map[full_length]
+    start_1_based, end_specification = bounds_spec
     start_index = start_1_based - 1
 
     if end_specification <= 0:
