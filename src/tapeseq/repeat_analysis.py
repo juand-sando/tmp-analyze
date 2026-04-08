@@ -8,8 +8,8 @@ from .outputs import (
     write_per_accession_repeat_window_scores,
     write_supplied_repeat_summary,
 )
-from .parsing import load_full_sequences, load_supplied_repeats, load_trimmings
-from .signal import add_trimmed_signal, build_or_load_full_sequence_signal, choose_projection
+from .parsing import load_full_sequences, load_supplied_repeats
+from .signal import build_or_load_full_sequence_signal, choose_projection
 
 
 def find_repeat_range_exact(full_sequence: str, repeat_sequence: str) -> tuple[int, int] | None:
@@ -132,15 +132,12 @@ def run(config: AnalysisConfig) -> str:
     write_analysis_metadata(config)
 
     sequences_by_accession = load_full_sequences(config.input_fasta)
-    trimming_map = load_trimmings(config.trimmings_csv) if config.trimmings_csv else None
     repeat_records = load_supplied_repeats(config.repeats_fasta) if config.repeats_fasta else []
 
     signals_by_accession: dict[str, SequenceSignal] = {}
     for accession, full_sequence in sequences_by_accession.items():
         print(f"Processing accession {accession}")
         signal = build_or_load_full_sequence_signal(accession, full_sequence, config)
-        if trimming_map is not None:
-            signal = add_trimmed_signal(signal, trimming_map, config)
         signals_by_accession[accession] = signal
 
     repeat_scores = score_supplied_repeats(signals_by_accession, repeat_records, config)

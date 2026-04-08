@@ -15,6 +15,8 @@ def main(argv: list[str] | None = None) -> None:
         config.trimmings_csv = Path(config.trimmings_csv)
     if config.repeats_fasta is not None:
         config.repeats_fasta = Path(config.repeats_fasta)
+    if config.reference_domain_fasta is not None:
+        config.reference_domain_fasta = Path(config.reference_domain_fasta)
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
     setup_run_logging(config)
@@ -25,6 +27,8 @@ def main(argv: list[str] | None = None) -> None:
         from .periodicity import run
     elif config.mode == "repeat-analysis":
         from .repeat_analysis import run
+    elif config.mode == "map-domain":
+        from .map_domain import run
     else:
         raise SystemExit(f"ERROR: unsupported mode {config.mode}")
 

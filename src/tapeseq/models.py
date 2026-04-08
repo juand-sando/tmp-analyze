@@ -16,6 +16,8 @@ class AnalysisConfig:
     cache_dir: Path
     trimmings_csv: Path | None = None
     repeats_fasta: Path | None = None
+    reference_accession: str | None = None
+    reference_domain_fasta: Path | None = None
     smooth_iterations: int = 20
     fft_min: int = 3
     fft_max: int = 19
@@ -67,3 +69,23 @@ class SuppliedRepeatScore:
     window_end: int | None
     window_length: int | None
     score: float | None
+
+
+@dataclass
+class MapDomainQCRecord:
+    accession: str
+    status: str
+    warning: str
+    reference_accession: str
+    reference_domain_method: str
+    reference_domain_start: int | None
+    reference_domain_end: int | None
+    alignment_start_column: int | None
+    alignment_end_column: int | None
+    reference_domain_length: int
+    mapped_start: int | None
+    mapped_end: int | None
+    mapped_length: int | None
+    coverage_fraction: float | None
+    edge_gap_left: int | None
+    edge_gap_right: int | None

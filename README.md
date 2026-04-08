@@ -12,11 +12,12 @@ Each run also writes metadata under `output_dir/run_metadata/`, including:
 - `run.log`
 - `current_state.json`
 
-It currently exposes three modes:
+It currently exposes four modes:
 
 - `exploratory`: write raw and smoothed heatmaps plus projection plots for each accession
-- `periodicity`: run Fourier analysis on trimmed sequences and write a periodicity summary
+- `periodicity`: run Fourier analysis on the full or trimmed focused window and write a periodicity summary
 - `repeat-analysis`: score supplied repeats against the full-sequence projection
+- `map-domain`: project a reference domain through an alignment and generate accession-based trimming rules
 
 ## Installation
 
@@ -41,6 +42,7 @@ This installs the required packages and installs this repository in editable mod
 tapeseq exploratory INPUT.fasta OUTPUT_DIR --trimmings TRIMS.csv
 tapeseq periodicity INPUT.fasta OUTPUT_DIR --trimmings TRIMS.csv
 tapeseq repeat-analysis INPUT.fasta OUTPUT_DIR --repeats-fasta REPEATS.fasta
+tapeseq map-domain ALIGNMENT.fasta OUTPUT_DIR --reference-accession REF_ACC --reference-domain DOMAIN.fasta
 
 # Optional cache controls
 tapeseq exploratory INPUT.fasta OUTPUT_DIR --cache-dir /path/to/cache
@@ -74,6 +76,15 @@ ACC002,20,130
 ```
 
 Mixed files are also accepted. When both are present, accession-specific rules take precedence over length-based rules.
+
+## Domain Mapping
+
+`map-domain` takes an aligned FASTA, a reference accession from that alignment, and a FASTA containing the reference domain sequence. It projects that domain window through the alignment and writes:
+
+- `global_outputs/map_domain/mapped_domain_trimmings.csv`
+- `global_outputs/map_domain/mapped_domain_qc.csv`
+
+Only conservative accession-based trimming rules are emitted. Accessions with weak or ambiguous mappings are kept in the QC file and skipped from the trimming CSV.
 
 You can also run the repository-local compatibility entrypoint:
 
