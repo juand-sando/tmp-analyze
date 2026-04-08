@@ -70,7 +70,7 @@ def analyze_periodicity(signal: SequenceSignal, config: AnalysisConfig) -> Perio
     if signal.trimmed_sequence is None:
         return None
 
-    projection = choose_projection(signal, use_trimmed=True, signal_source=config.signal_source)
+    projection = choose_projection(signal, use_trimmed=True)
     if projection is None or projection.size == 0:
         return None
 
@@ -108,11 +108,11 @@ def write_periodicity_outputs(signal: SequenceSignal, result: PeriodicityResult,
             output_directory / f"{signal.accession}_trimmed_matrix.csv",
         )
 
-    projection = choose_projection(signal, use_trimmed=True, signal_source=config.signal_source)
+    projection = choose_projection(signal, use_trimmed=True)
     if projection is not None:
         save_projection_plot(
             projection,
-            f"{signal.accession} trimmed projection",
+            f"{signal.accession} trimmed standardized projection",
             output_directory / f"{signal.accession}_projection.png",
         )
         power_spectrum, _, _ = fft_power_and_peak(

@@ -2,6 +2,8 @@
 
 `tapeseq` is a small command-line toolkit for sequence self-similarity analysis.
 
+All downstream analysis uses a standardized full-sequence projection computed from a reproducible shuffled baseline derived from the input sequence, accession, and master seed.
+
 It currently exposes three modes:
 
 - `exploratory`: write raw and smoothed heatmaps plus projection plots for each accession

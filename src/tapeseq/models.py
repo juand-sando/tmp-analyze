@@ -15,8 +15,6 @@ class AnalysisConfig:
     output_dir: Path
     trimmings_csv: Path | None = None
     repeats_fasta: Path | None = None
-    signal_source: str = "raw"
-    baseline_mode: str = "none"
     smooth_iterations: int = 20
     fft_min: int = 3
     fft_max: int = 19

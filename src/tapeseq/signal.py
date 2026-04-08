@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import random
 from functools import lru_cache
 
@@ -76,16 +77,24 @@ def scrambled_sequence(sequence: str, seed: int) -> str:
     return "".join(residues)
 
 
+def stable_accession_seed(accession: str, sequence: str, master_seed: int) -> int:
+    seed_material = f"{master_seed}\n{accession}\n{sequence}".encode("utf-8")
+    digest = hashlib.sha256(seed_material).digest()
+    return int.from_bytes(digest[:8], byteorder="big", signed=False)
+
+
 def build_projection_baseline(
+    accession: str,
     sequence: str,
     smooth_iterations: int,
     num_shuffles: int,
-    seed: int,
+    master_seed: int,
 ) -> tuple[float, float]:
     randomized_projection_values: list[np.ndarray] = []
+    accession_seed = stable_accession_seed(accession, sequence, master_seed)
 
     for shuffle_index in range(num_shuffles):
-        shuffled_sequence = scrambled_sequence(sequence, seed + shuffle_index)
+        shuffled_sequence = scrambled_sequence(sequence, accession_seed + shuffle_index)
         randomized_matrix = build_self_matrix(shuffled_sequence)
         randomized_smoothed_matrix = smooth_matrix(randomized_matrix, iterations=smooth_iterations)
         randomized_projection = project_rowwise_max(randomized_smoothed_matrix)
@@ -111,21 +120,20 @@ def build_full_sequence_signal(accession: str, full_sequence: str, config: Analy
     signal.raw_matrix_full = build_self_matrix(full_sequence)
     signal.smoothed_matrix_full = smooth_matrix(signal.raw_matrix_full.copy(), iterations=config.smooth_iterations)
     signal.projection_full_raw = project_rowwise_max(signal.smoothed_matrix_full)
-
-    if config.baseline_mode == "global_projection":
-        baseline_mean, baseline_std = build_projection_baseline(
-            sequence=full_sequence,
-            smooth_iterations=config.smooth_iterations,
-            num_shuffles=config.num_shuffles,
-            seed=config.seed,
-        )
-        signal.full_baseline_mean = baseline_mean
-        signal.full_baseline_std = baseline_std
-        signal.projection_full_standardized = standardize_signal(
-            signal.projection_full_raw,
-            baseline_mean,
-            baseline_std,
-        )
+    baseline_mean, baseline_std = build_projection_baseline(
+        accession=accession,
+        sequence=full_sequence,
+        smooth_iterations=config.smooth_iterations,
+        num_shuffles=config.num_shuffles,
+        master_seed=config.seed,
+    )
+    signal.full_baseline_mean = baseline_mean
+    signal.full_baseline_std = baseline_std
+    signal.projection_full_standardized = standardize_signal(
+        signal.projection_full_raw,
+        baseline_mean,
+        baseline_std,
+    )
 
     return signal
 
@@ -147,26 +155,24 @@ def add_trimmed_signal(
     signal.trimmed_sequence = trimmed_sequence
     signal.trimming_start_index = start_index
     signal.trimming_end_index = end_index
-    signal.raw_matrix_trimmed = build_self_matrix(trimmed_sequence)
-    signal.smoothed_matrix_trimmed = smooth_matrix(signal.raw_matrix_trimmed.copy(), iterations=config.smooth_iterations)
-    signal.projection_trimmed_raw = project_rowwise_max(signal.smoothed_matrix_trimmed)
 
-    if config.baseline_mode == "global_projection" and signal.full_baseline_mean is not None and signal.full_baseline_std is not None:
-        signal.projection_trimmed_standardized = standardize_signal(
-            signal.projection_trimmed_raw,
-            signal.full_baseline_mean,
-            signal.full_baseline_std,
-        )
+    if signal.raw_matrix_full is not None:
+        signal.raw_matrix_trimmed = signal.raw_matrix_full[start_index:end_index, start_index:end_index].copy()
+
+    if signal.smoothed_matrix_full is not None:
+        signal.smoothed_matrix_trimmed = signal.smoothed_matrix_full[start_index:end_index, start_index:end_index].copy()
+
+    if signal.projection_full_raw is not None:
+        signal.projection_trimmed_raw = signal.projection_full_raw[start_index:end_index].copy()
+
+    if signal.projection_full_standardized is not None:
+        signal.projection_trimmed_standardized = signal.projection_full_standardized[start_index:end_index].copy()
 
     return signal
 
 
-def choose_projection(signal: SequenceSignal, use_trimmed: bool, signal_source: str) -> np.ndarray | None:
+def choose_projection(signal: SequenceSignal, use_trimmed: bool) -> np.ndarray | None:
     if use_trimmed:
-        if signal_source == "standardized":
-            return signal.projection_trimmed_standardized
-        return signal.projection_trimmed_raw
+        return signal.projection_trimmed_standardized
 
-    if signal_source == "standardized":
-        return signal.projection_full_standardized
-    return signal.projection_full_raw
+    return signal.projection_full_standardized

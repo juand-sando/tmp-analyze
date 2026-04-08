@@ -101,8 +101,7 @@ def write_periodicity_summary(
     with summary_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         headers = ["accession", "trimmed_length", "max_frequency", "max_power", "period", "repeat_count"]
-        if config.baseline_mode == "global_projection":
-            headers.extend(["full_baseline_mean", "full_baseline_std"])
+        headers.extend(["full_baseline_mean", "full_baseline_std"])
         writer.writerow(headers)
 
         for result in results:
@@ -114,12 +113,9 @@ def write_periodicity_summary(
                 f"{result.best_power:.6f}",
                 f"{result.period:.6f}",
                 result.repeat_count,
+                "" if signal.full_baseline_mean is None else f"{signal.full_baseline_mean:.6f}",
+                "" if signal.full_baseline_std is None else f"{signal.full_baseline_std:.6f}",
             ]
-            if config.baseline_mode == "global_projection":
-                row.extend([
-                    "" if signal.full_baseline_mean is None else f"{signal.full_baseline_mean:.6f}",
-                    "" if signal.full_baseline_std is None else f"{signal.full_baseline_std:.6f}",
-                ])
             writer.writerow(row)
 
 
@@ -153,7 +149,7 @@ def write_per_accession_repeat_window_scores(repeat_scores: list[SuppliedRepeatS
                 repeat_label = f"R{score_record.suffix}" if score_record.suffix != "F" else "RF"
                 writer.writerow([
                     score_record.accession,
-                    config.signal_source,
+                    "standardized",
                     score_record.suffix,
                     repeat_label,
                     score_record.repeat_sequence,

@@ -13,8 +13,6 @@ def add_common_signal_arguments(
     parser.add_argument("input_fasta", help="FASTA of full sequences.")
     parser.add_argument("output_dir", help="Output directory.")
     parser.add_argument("-t", "--trimmings", dest="trimmings_csv", help="CSV with trimming rules.")
-    parser.add_argument("--signal-source", choices=["raw", "standardized"], default="raw")
-    parser.add_argument("--baseline-mode", choices=["none", "global_projection"], default="none")
     parser.add_argument("--smooth-iters", dest="smooth_iterations", type=int, default=20)
     if include_write_svg:
         parser.add_argument("--write-svg", action="store_true")
@@ -69,8 +67,6 @@ def parse_args(argv: list[str] | None = None) -> AnalysisConfig:
         output_dir=args.output_dir,
         trimmings_csv=getattr(args, "trimmings_csv", None),
         repeats_fasta=getattr(args, "repeats_fasta", None),
-        signal_source=getattr(args, "signal_source", "raw"),
-        baseline_mode=getattr(args, "baseline_mode", "none"),
         smooth_iterations=getattr(args, "smooth_iterations", 20),
         fft_min=getattr(args, "fft_min", 3),
         fft_max=getattr(args, "fft_max", 19),
@@ -90,9 +86,6 @@ def validate_config(config: AnalysisConfig) -> None:
 
     if config.mode == "repeat-analysis" and config.repeats_fasta is None:
         raise SystemExit("ERROR: repeat-analysis requires --repeats-fasta.")
-
-    if config.signal_source == "standardized" and config.baseline_mode == "none":
-        raise SystemExit("ERROR: --signal-source standardized requires --baseline-mode global_projection.")
 
     if config.num_shuffles < 1:
         raise SystemExit("ERROR: --num-shuffles must be >= 1.")

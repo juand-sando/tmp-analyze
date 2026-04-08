@@ -92,7 +92,7 @@ def score_supplied_repeats(
         if signal is None:
             continue
 
-        projection = choose_projection(signal, use_trimmed=False, signal_source=config.signal_source)
+        projection = choose_projection(signal, use_trimmed=False)
         if projection is None or projection.size == 0:
             continue
 
