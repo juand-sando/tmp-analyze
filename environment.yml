@@ -1,4 +1,4 @@
-name: tapeseq
+name: tapemeasure-analyze
 channels:
   - conda-forge
 dependencies:
