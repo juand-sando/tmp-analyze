@@ -8,6 +8,7 @@ from Bio.PDB import MMCIFParser, PDBParser
 from Bio.PDB.Polypeptide import is_aa
 
 from ..shared.run_logging import get_logger
+from .points import normalize_points_dataframe
 
 
 def _warn(message: str) -> None:
@@ -81,9 +82,15 @@ def extract_points_from_structure_file(input_path: Path) -> pd.DataFrame:
 
         atom = residue["CA"]
         coordinates = atom.get_coord()
+        insertion_code = residue.id[2].strip() if isinstance(residue.id[2], str) else str(residue.id[2]).strip()
+        if insertion_code:
+            raise SystemExit(
+                f"ERROR: structure file {input_path} contains insertion-coded residues, which are not "
+                "supported for the Pos-based smoothing workflow."
+            )
         rows.append(
             {
-                "Pos": len(rows) + 1,
+                "Pos": int(residue.id[1]),
                 "Res": residue.get_resname().strip(),
                 "X": float(coordinates[0]),
                 "Y": float(coordinates[1]),
@@ -99,4 +106,7 @@ def extract_points_from_structure_file(input_path: Path) -> pd.DataFrame:
     if not rows:
         raise SystemExit(f"ERROR: no C-alpha coordinates found in structure file {input_path}.")
 
-    return pd.DataFrame(rows, columns=["Pos", "Res", "X", "Y", "Z"])
+    return normalize_points_dataframe(
+        pd.DataFrame(rows, columns=["Pos", "Res", "X", "Y", "Z"]),
+        source_label=str(input_path),
+    )

@@ -9,9 +9,6 @@ class BulkinessConfig:
     mode: str
     input_path: Path
     output_dir: Path
-    radii: list[float] = field(default_factory=lambda: [10.0])
-    k_neighbors: int = 10
-    subtract_baseline: bool = False
-    baseline_spacing: float = 3.8
-    histogram_bins: int = 40
+    radius: float = 10.0
+    max_neighbors: int = 15
     make_plots: bool = False

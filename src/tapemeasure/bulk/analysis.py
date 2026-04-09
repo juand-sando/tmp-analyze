@@ -3,99 +3,131 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
-from scipy.spatial.distance import pdist
 
 
-def compute_straight_chain_baseline(radius: float, spacing: float = 3.8) -> int:
-    if radius <= 0:
-        return 0
-    expected_neighbors_each_side = int(np.floor(radius / spacing))
-    return 2 * expected_neighbors_each_side
+def sphere_volume_nm3(radius_angstrom: float) -> float:
+    radius_nm = radius_angstrom / 10.0
+    return (4.0 / 3.0) * np.pi * (radius_nm ** 3)
 
 
 def compute_bulkiness_measures(
     points_dataframe: pd.DataFrame,
-    radii: list[float],
-    k_neighbors: int,
-    subtract_baseline: bool,
-    baseline_spacing: float,
+    radius: float,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     coordinates = points_dataframe[["X", "Y", "Z"]].to_numpy(dtype=float)
     point_count = len(coordinates)
     if point_count < 2:
         raise SystemExit("ERROR: bulkiness analysis requires at least 2 coordinates.")
 
-    effective_k = min(k_neighbors, point_count - 1)
     kd_tree = cKDTree(coordinates)
-
     output_dataframe = points_dataframe.copy()
-    neighbor_counts_summary: dict[str, dict[str, float | int]] = {}
+    neighbors_within_radius = kd_tree.query_ball_point(coordinates, r=radius)
+    neighbor_count_within_radius = np.array(
+        [len(neighbor_list) - 1 for neighbor_list in neighbors_within_radius],
+        dtype=int,
+    )
 
-    for radius in radii:
-        neighbors_within_radius = kd_tree.query_ball_point(coordinates, r=radius)
-        neighbor_count_within_radius = np.array(
-            [len(neighbor_list) - 1 for neighbor_list in neighbors_within_radius],
-            dtype=int,
-        )
+    output_dataframe["neighbor_count"] = neighbor_count_within_radius
+    smoothed_values = iterative_chain_smoothing(output_dataframe["Pos"].tolist(), neighbor_count_within_radius, rounds=3)
+    output_dataframe["neighbor_count_smoothed"] = output_dataframe["Pos"].map(smoothed_values)
+    bulkiness_denominator_nm3 = sphere_volume_nm3(radius)
+    output_dataframe["bulkiness_score_ca_per_nm3"] = (
+        output_dataframe["neighbor_count_smoothed"] / bulkiness_denominator_nm3
+    )
 
-        count_column_name = f"neighbor_count_r{radius:g}"
-        output_dataframe[count_column_name] = neighbor_count_within_radius
-        neighbor_counts_summary[count_column_name] = {
+    smoothed_array = output_dataframe["neighbor_count_smoothed"].dropna().to_numpy(dtype=float)
+    bulkiness_score_array = output_dataframe["bulkiness_score_ca_per_nm3"].dropna().to_numpy(dtype=float)
+
+    summary: dict[str, object] = {
+        "num_points": int(point_count),
+        "radius": float(radius),
+        "radius_nm": float(radius / 10.0),
+        "sphere_volume_nm3": float(bulkiness_denominator_nm3),
+        "smoothing_rounds": 3,
+        "neighbor_count": {
             "mean": float(np.mean(neighbor_count_within_radius)),
             "median": float(np.median(neighbor_count_within_radius)),
             "min": int(np.min(neighbor_count_within_radius)),
             "max": int(np.max(neighbor_count_within_radius)),
-        }
-
-        if subtract_baseline:
-            expected_baseline = compute_straight_chain_baseline(radius=radius, spacing=baseline_spacing)
-            extra_crowding = neighbor_count_within_radius - expected_baseline
-            extra_column_name = f"extra_crowding_r{radius:g}"
-            output_dataframe[extra_column_name] = extra_crowding
-            neighbor_counts_summary[extra_column_name] = {
-                "baseline_expected": int(expected_baseline),
-                "mean": float(np.mean(extra_crowding)),
-                "median": float(np.median(extra_crowding)),
-                "min": int(np.min(extra_crowding)),
-                "max": int(np.max(extra_crowding)),
-            }
-
-    knn_distances, _ = kd_tree.query(coordinates, k=effective_k + 1)
-    first_k_distances = knn_distances[:, 1:effective_k + 1]
-    k_mean_neighbor_distance = np.mean(first_k_distances, axis=1)
-
-    output_dataframe["k_mean_neighbor_distance"] = k_mean_neighbor_distance
-    output_dataframe["knn_bulkiness_score"] = 1.0 / (k_mean_neighbor_distance ** 3 + 1e-12)
-
-    summary: dict[str, object] = {
-        "num_points": int(point_count),
-        "radii": radii,
-        "k_neighbors_requested": int(k_neighbors),
-        "k_neighbors_used": int(effective_k),
-        "neighbor_counts": neighbor_counts_summary,
-        "k_mean_neighbor_distance": {
-            "mean": float(np.mean(k_mean_neighbor_distance)),
-            "median": float(np.median(k_mean_neighbor_distance)),
-            "min": float(np.min(k_mean_neighbor_distance)),
-            "max": float(np.max(k_mean_neighbor_distance)),
+        },
+        "smoothed_neighbor_count": None
+        if smoothed_array.size == 0
+        else {
+            "mean": float(np.mean(smoothed_array)),
+            "median": float(np.median(smoothed_array)),
+            "min": float(np.min(smoothed_array)),
+            "max": float(np.max(smoothed_array)),
+            "surviving_positions": int(smoothed_array.size),
+        },
+        "bulkiness_score_ca_per_nm3": None
+        if bulkiness_score_array.size == 0
+        else {
+            "mean": float(np.mean(bulkiness_score_array)),
+            "median": float(np.median(bulkiness_score_array)),
+            "min": float(np.min(bulkiness_score_array)),
+            "max": float(np.max(bulkiness_score_array)),
+            "surviving_positions": int(bulkiness_score_array.size),
         },
     }
     return output_dataframe, summary
 
 
-def compute_all_pairwise_distances(points_dataframe: pd.DataFrame) -> np.ndarray:
+def iterative_chain_smoothing(
+    positions: list[int],
+    values: np.ndarray,
+    *,
+    rounds: int,
+) -> dict[int, float]:
+    current_values = {int(position): float(value) for position, value in zip(positions, values, strict=True)}
+    for _ in range(rounds):
+        next_values: dict[int, float] = {}
+        for position in sorted(current_values.keys()):
+            left_position = position - 1
+            right_position = position + 1
+            if left_position not in current_values or right_position not in current_values:
+                continue
+            next_values[position] = (
+                0.5 * current_values[position]
+                + 0.25 * current_values[left_position]
+                + 0.25 * current_values[right_position]
+            )
+        current_values = next_values
+        if not current_values:
+            break
+    return current_values
+
+
+def compute_nearest_neighbor_distance_profiles(
+    points_dataframe: pd.DataFrame,
+    max_neighbors: int,
+) -> tuple[pd.DataFrame, dict[str, object]]:
     coordinates = points_dataframe[["X", "Y", "Z"]].to_numpy(dtype=float)
-    if len(coordinates) < 2:
-        raise SystemExit("ERROR: pairwise distance analysis requires at least 2 coordinates.")
-    return pdist(coordinates, metric="euclidean")
+    point_count = len(coordinates)
+    if point_count < 2:
+        raise SystemExit("ERROR: nearest-neighbor analysis requires at least 2 coordinates.")
 
+    effective_max_neighbors = min(max_neighbors, point_count - 1)
+    kd_tree = cKDTree(coordinates)
+    neighbor_distances, _ = kd_tree.query(coordinates, k=effective_max_neighbors + 1)
+    ranked_neighbor_distances = neighbor_distances[:, 1:effective_max_neighbors + 1]
 
-def summarize_pairwise_distances(all_pairwise_distances: np.ndarray, point_count: int) -> dict[str, float | int]:
-    return {
+    output_dataframe = points_dataframe[["Pos", "Res"]].copy()
+    summary_by_rank: dict[str, dict[str, float | int]] = {}
+
+    for neighbor_rank in range(1, effective_max_neighbors + 1):
+        distance_values = ranked_neighbor_distances[:, neighbor_rank - 1]
+        output_dataframe[f"neighbor_{neighbor_rank}_distance"] = distance_values
+        summary_by_rank[f"neighbor_{neighbor_rank}"] = {
+            "mean_distance": float(np.mean(distance_values)),
+            "median_distance": float(np.median(distance_values)),
+            "min_distance": float(np.min(distance_values)),
+            "max_distance": float(np.max(distance_values)),
+        }
+
+    summary: dict[str, object] = {
         "num_points": int(point_count),
-        "num_pairs": int(len(all_pairwise_distances)),
-        "mean_distance": float(np.mean(all_pairwise_distances)),
-        "median_distance": float(np.median(all_pairwise_distances)),
-        "min_distance": float(np.min(all_pairwise_distances)),
-        "max_distance": float(np.max(all_pairwise_distances)),
+        "max_neighbors_requested": int(max_neighbors),
+        "max_neighbors_used": int(effective_max_neighbors),
+        "neighbor_distance_summary": summary_by_rank,
     }
+    return output_dataframe, summary

@@ -1,11 +1,11 @@
 # tapemeasure-analyze
 
-`tapemeasure-analyze` is a  toolkit for studying tape measure proteins of giant eukaryotic dsDNA viruses (Nucleocytoviricota). Ranavirus tape measure proteins are long viral proteins whose lengths, internal organization, repeat structure, and local folding patterns may help frame comparative questions across regarding outer capsid size determination acroos icosahedral giant viruses.
+`tapemeasure-analyze` is a  toolkit for studying tape measure proteins of giant eukaryotic dsDNA viruses (Nucleocytoviricota). Tape measure proteins are long viral proteins whose lengths, internal organization, repeat structure, and local folding patterns may help frame comparative questions regarding outer capsid size determination across icosahedral giant viruses.
 
 **What This Repository Contains**
 
 - `tapeseq`: computes sequence self-similarity signals, detects periodicity with said signal, and assigns repeat-associated scores.
-- `tapebulk`: computes local coordinate crowding and pairwise distance distributions from 3D residue coordinates to determine different structural domains.
+- `tapebulk`: computes local coordinate crowding and nearest-neighbor distance profiles from 3D residue coordinates to determine different structural domains.
 
 ## Installation
 
@@ -218,13 +218,17 @@ tapebulk pairwise-histogram --help
 
 Measure local spatial crowding along the chain.
 
-It loads residue coordinates either directly from a CSV or by extracting C-alpha positions from a PDB or mmCIF model. It then uses a KD-tree for efficient neighborhood queries, counts neighbors within one or more radii for every residue, optionally subtracts the expected neighbor count for a perfectly straight chain, and computes the mean distance to the first `k` nearest neighbors.
+It loads residue coordinates either directly from a CSV or by extracting C-alpha positions from a PDB or mmCIF model. It then uses a KD-tree for efficient neighborhood queries and counts how many residues fall within a single chosen radius around each residue.
 
-The program then converts that mean nearest-neighbor distance into a simple crowding score:
+After that, the raw neighbor-count profile is smoothed for three rounds using the rule:
 
 ```text
-bulkiness score = 1 / (mean k-nearest-neighbor distance)^3
+new_i = 0.5*x_i + 0.25*x_{i-1} + 0.25*x_{i+1}
 ```
+
+This smoothing is applied along residue position, not in 3D space. After each round, any residue that does not have both immediate neighboring residue positions available is dropped from the next round. That means N- and C-terminal residues are removed round by round, and residues next to internal modeling gaps are also removed round by round. The final smoothed values are stored in a separate output column.
+
+The final bulkiness score is then calculated from the smoothed values by dividing them by the volume of a sphere with the chosen radius. Although the radius is provided in Angstroms, it is converted internally to nanometers before the sphere volume is calculated, so the final score is reported in `Ca/nm^3`.
 
 Typical command:
 
@@ -232,12 +236,10 @@ Typical command:
 tapebulk bulkiness \
   -i POINTS.csv \
   -o OUTPUT_DIR \
-  --radii 6 10 15 \
-  --k-neighbors 10 \
-  --subtract-baseline \
+  --radius 10 \
   --make-plots
 
-tapebulk bulkiness -i MODEL.pdb -o OUTPUT_DIR --radii 6 10 15 --k-neighbors 10
+tapebulk bulkiness -i MODEL.pdb -o OUTPUT_DIR --radius 10
 ```
 
 If the input is a structure file, the extracted coordinate table is also written before the bulkiness analysis continues.
@@ -247,26 +249,26 @@ Typical outputs:
 - `global_outputs/bulkiness/extracted_ca_coordinates.csv` when the input is a structure file
 - `global_outputs/bulkiness/bulkiness_table.csv`
 - `global_outputs/bulkiness/bulkiness_summary.json`
-- optional PNG plots for neighbor counts, extra crowding, and kNN bulkiness
+- optional PNG plot of bulkiness score versus residue position, with gaps preserved
 
 ### `tapebulk pairwise-histogram`
 
-Summarize the global distance distribution of the coordinate set.
+Summarize how the distance to the nearest neighbors changes along the chain.
 
-It loads residue coordinates from CSV, PDB, or mmCIF. For structure files it first extracts the `Pos,Res,X,Y,Z` C-alpha coordinate table. It then computes all pairwise Euclidean distances, writes the distance list to CSV, writes a histogram plot, and stores summary statistics as JSON.
+It loads residue coordinates from CSV, PDB, or mmCIF. For structure files it first extracts the `Pos,Res,X,Y,Z` C-alpha coordinate table. It then computes the distance from each residue to its 1st nearest neighbor, 2nd nearest neighbor, and so on up to a chosen maximum rank. These traces are plotted together as a single multi-panel figure so they are easier to inspect without collapsing everything into one crowded plot.
 
 Typical command:
 
 ```bash
-tapebulk pairwise-histogram -i POINTS.csv -o OUTPUT_DIR --histogram-bins 40
-tapebulk pairwise-histogram -i MODEL.cif -o OUTPUT_DIR --histogram-bins 40
+tapebulk pairwise-histogram -i POINTS.csv -o OUTPUT_DIR --max-neighbors 15
+tapebulk pairwise-histogram -i MODEL.cif -o OUTPUT_DIR --max-neighbors 15
 ```
 
 Typical outputs:
 
-- `global_outputs/bulkiness/pairwise_distances.csv`
-- `global_outputs/bulkiness/pairwise_distance_summary.json`
-- `global_outputs/bulkiness/pairwise_distance_hist.png`
+- `global_outputs/bulkiness/nearest_neighbor_distance_profiles.csv`
+- `global_outputs/bulkiness/nearest_neighbor_distance_summary.json`
+- `global_outputs/bulkiness/nearest_neighbor_distance_profiles.png`
 
 ## Compatibility Wrappers
 

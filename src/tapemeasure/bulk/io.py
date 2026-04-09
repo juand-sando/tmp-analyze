@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from .points import normalize_points_dataframe
 from .structure_io import extract_points_from_structure_file
 
 REQUIRED_COLUMNS = {"Pos", "Res", "X", "Y", "Z"}
@@ -16,7 +17,7 @@ def load_points(csv_path: Path) -> pd.DataFrame:
             f"ERROR: {csv_path} must contain columns {sorted(REQUIRED_COLUMNS)}, "
             f"but has {sorted(points_dataframe.columns)}."
         )
-    return points_dataframe
+    return normalize_points_dataframe(points_dataframe, source_label=str(csv_path))
 
 
 def load_points_from_input(input_path: Path) -> tuple[pd.DataFrame, str]:

@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from .analysis import compute_all_pairwise_distances, compute_bulkiness_measures, summarize_pairwise_distances
+from .analysis import compute_bulkiness_measures, compute_nearest_neighbor_distance_profiles
 from .io import load_points
-from .plotting import plot_bulkiness, plot_pairwise_distance_histogram
+from .plotting import plot_bulkiness, plot_nearest_neighbor_profiles
 
 
 def parse_arguments(argv=None):
     parser = argparse.ArgumentParser(
-        description="Compute bulkiness or pairwise-distance histogram from a 3D C-alpha CSV."
+        description="Compute radius-based neighbor counts or nearest-neighbor profiles from a 3D C-alpha CSV."
     )
     parser.add_argument("csv_path", type=str, help="Path to input CSV with columns Pos, Res, X, Y, Z.")
     parser.add_argument(
@@ -24,28 +24,10 @@ def parse_arguments(argv=None):
         help="Which output to produce.",
     )
     parser.add_argument(
-        "--radii",
+        "--radius",
         type=float,
-        nargs="+",
-        default=[10.0],
-        help="One or more radii for neighbor counts.",
-    )
-    parser.add_argument(
-        "--k_neighbors",
-        type=int,
         default=10,
-        help="k for kNN mean-distance bulkiness.",
-    )
-    parser.add_argument(
-        "--subtract_baseline",
-        action="store_true",
-        help="Subtract expected neighbors for a straight chain.",
-    )
-    parser.add_argument(
-        "--baseline_spacing",
-        type=float,
-        default=3.8,
-        help="Spacing used for the straight-chain baseline.",
+        help="Radius in Angstroms used to count spatial neighbors.",
     )
     parser.add_argument(
         "--output_csv",
@@ -65,16 +47,16 @@ def parse_arguments(argv=None):
         help="Prefix for bulkiness plot filenames. Default: output CSV stem.",
     )
     parser.add_argument(
-        "--histogram_bins",
+        "--max_neighbors",
         type=int,
-        default=40,
-        help="Number of bins for the pairwise distance histogram.",
+        default=15,
+        help="Maximum nearest-neighbor rank to analyze.",
     )
     parser.add_argument(
         "--pairwise_output_csv",
         type=str,
         default=None,
-        help="Output CSV path for pairwise mode. Default: <input>_pairwise_distances.csv",
+        help="Output CSV path for pairwise mode. Default: <input>_nearest_neighbor_distance_profiles.csv",
     )
     return parser.parse_args(argv)
 
@@ -90,10 +72,7 @@ def main(argv=None):
     if args.mode == "bulkiness":
         output_dataframe, summary = compute_bulkiness_measures(
             points_dataframe=points_dataframe,
-            radii=args.radii,
-            k_neighbors=args.k_neighbors,
-            subtract_baseline=args.subtract_baseline,
-            baseline_spacing=args.baseline_spacing,
+            radius=args.radius,
         )
 
         output_csv_path = Path(args.output_csv) if args.output_csv else csv_path.with_name(csv_path.stem + "_bulkiness.csv")
@@ -114,8 +93,6 @@ def main(argv=None):
             output_directory.mkdir(parents=True, exist_ok=True)
             written_paths = plot_bulkiness(
                 output_dataframe=output_dataframe,
-                radii=args.radii,
-                subtract_baseline=args.subtract_baseline,
                 output_dir=output_directory,
                 file_prefix=file_prefix,
             )
@@ -124,25 +101,28 @@ def main(argv=None):
                 print(" ", written_path)
         return
 
-    all_pairwise_distances = compute_all_pairwise_distances(points_dataframe)
+    profile_dataframe, summary = compute_nearest_neighbor_distance_profiles(
+        points_dataframe=points_dataframe,
+        max_neighbors=args.max_neighbors,
+    )
     pairwise_csv_path = (
         Path(args.pairwise_output_csv)
         if args.pairwise_output_csv
-        else csv_path.with_name(csv_path.stem + "_pairwise_distances.csv")
+        else csv_path.with_name(csv_path.stem + "_nearest_neighbor_distance_profiles.csv")
     )
-    pd.DataFrame({"pairwise_distance": all_pairwise_distances}).to_csv(pairwise_csv_path, index=False)
+    profile_dataframe.to_csv(pairwise_csv_path, index=False)
 
-    histogram_png_path = csv_path.with_name(csv_path.stem + "_pairwise_distance_hist.png")
-    plot_pairwise_distance_histogram(
-        all_pairwise_distances=all_pairwise_distances,
-        histogram_bins=args.histogram_bins,
-        output_png_path=histogram_png_path,
+    profile_png_path = csv_path.with_name(csv_path.stem + "_nearest_neighbor_distance_profiles.png")
+    plot_nearest_neighbor_profiles(
+        profile_dataframe=profile_dataframe,
+        max_neighbors=int(summary["max_neighbors_used"]),
+        output_png_path=profile_png_path,
     )
 
-    print("\nSaved pairwise distances CSV to:", pairwise_csv_path)
-    print("Saved pairwise distance histogram to:", histogram_png_path)
-    print("\nPairwise distance summary:")
-    print(summarize_pairwise_distances(all_pairwise_distances, len(points_dataframe)))
+    print("\nSaved nearest-neighbor profile CSV to:", pairwise_csv_path)
+    print("Saved nearest-neighbor profile figure to:", profile_png_path)
+    print("\nNearest-neighbor distance summary:")
+    print(summary)
 
 
 if __name__ == "__main__":

@@ -38,34 +38,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     bulkiness = subparsers.add_parser(
         "bulkiness",
-        help="Compute neighbor-count and kNN bulkiness measures from 3D coordinates.",
+        help="Compute radius-based neighbor counts and a 3-round chain-aware smoothed profile.",
         formatter_class=FORMATTER_CLASS,
     )
     add_common_arguments(bulkiness)
     bulkiness.add_argument(
-        "--radii",
+        "--radius",
         type=float,
-        nargs="+",
-        default=[10.0],
-        help="One or more radii for neighbor counts.",
-    )
-    bulkiness.add_argument(
-        "--k-neighbors",
-        dest="k_neighbors",
-        type=int,
         default=10,
-        help="k for mean nearest-neighbor distance bulkiness.",
-    )
-    bulkiness.add_argument(
-        "--subtract-baseline",
-        action="store_true",
-        help="Subtract the expected straight-chain neighbor baseline.",
-    )
-    bulkiness.add_argument(
-        "--baseline-spacing",
-        type=float,
-        default=3.8,
-        help="Residue spacing used for the straight-chain baseline.",
+        help="Radius in Angstroms used to count spatial neighbors.",
     )
     bulkiness.add_argument(
         "--make-plots",
@@ -75,15 +56,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     pairwise = subparsers.add_parser(
         "pairwise-histogram",
-        help="Compute all pairwise distances and write a histogram.",
+        help="Compute nearest-neighbor distance profiles and write a multi-panel figure.",
         formatter_class=FORMATTER_CLASS,
     )
     add_common_arguments(pairwise)
     pairwise.add_argument(
-        "--histogram-bins",
+        "--max-neighbors",
         type=int,
-        default=40,
-        help="Number of bins in the pairwise-distance histogram.",
+        default=15,
+        help="Maximum nearest-neighbor rank to analyze.",
     )
 
     return parser
@@ -118,11 +99,8 @@ def parse_args(argv: list[str] | None = None) -> BulkinessConfig:
         mode=args.mode,
         input_path=input_path,
         output_dir=output_dir,
-        radii=list(getattr(args, "radii", [10.0])),
-        k_neighbors=getattr(args, "k_neighbors", 10),
-        subtract_baseline=getattr(args, "subtract_baseline", False),
-        baseline_spacing=getattr(args, "baseline_spacing", 3.8),
-        histogram_bins=getattr(args, "histogram_bins", 40),
+        radius=getattr(args, "radius", 10.0),
+        max_neighbors=getattr(args, "max_neighbors", 15),
         make_plots=getattr(args, "make_plots", False),
     )
     validate_config(config)
@@ -130,11 +108,7 @@ def parse_args(argv: list[str] | None = None) -> BulkinessConfig:
 
 
 def validate_config(config: BulkinessConfig) -> None:
-    if config.k_neighbors < 1:
-        raise SystemExit("ERROR: --k-neighbors must be >= 1.")
-    if any(radius <= 0 for radius in config.radii):
-        raise SystemExit("ERROR: all --radii values must be > 0.")
-    if config.baseline_spacing <= 0:
-        raise SystemExit("ERROR: --baseline-spacing must be > 0.")
-    if config.histogram_bins < 1:
-        raise SystemExit("ERROR: --histogram-bins must be >= 1.")
+    if config.radius <= 0:
+        raise SystemExit("ERROR: --radius must be > 0.")
+    if config.max_neighbors < 1:
+        raise SystemExit("ERROR: --max-neighbors must be >= 1.")
