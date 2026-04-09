@@ -9,7 +9,7 @@ from .workflows import run
 
 def main(argv: list[str] | None = None) -> None:
     config = parse_args(argv)
-    config.input_csv = Path(config.input_csv)
+    config.input_path = Path(config.input_path)
     config.output_dir = Path(config.output_dir)
 
     config.output_dir.mkdir(parents=True, exist_ok=True)

@@ -1,38 +1,13 @@
 # tapemeasure-analyze
 
-`tapemeasure-analyze` is a small research toolkit for studying tape measure proteins with two complementary command-line tools:
-
-- `tapeseq` for sequence-based analysis
-- `tapebulk` for structure-coordinate analysis
-
-Both tools are installed together and are meant to live in the same conda environment.
-
-**Biology**
-Tape measure proteins are typically very long phage proteins whose lengths and internal organization are often linked to tail architecture and assembly. In practice, people studying them often want to ask several related questions:
-
-- Does the sequence contain repeated or quasi-repeated internal structure?
-- Are there periodic patterns that may reflect recurring modules?
-- Can a domain annotated in one protein be mapped conservatively onto homologous proteins?
-- Does a structural model show locally crowded or expanded regions along the chain?
-
-This repository is built around those questions. The tools here are intended to help generate and compare hypotheses across tape measure proteins; they do not by themselves prove structural or functional mechanisms.
+`tapemeasure-analyze` is a  toolkit for studying tape measure proteins of giant eukaryotic dsDNA viruses (Nucleocytoviricota). Ranavirus tape measure proteins are long viral proteins whose lengths, internal organization, repeat structure, and local folding patterns may help frame comparative questions across regarding outer capsid size determination acroos icosahedral giant viruses.
 
 **What This Repository Contains**
 
-- `tapeseq`: computes sequence self-similarity signals, periodicity summaries, repeat-associated scores, and alignment-based domain mappings
-- `tapebulk`: computes local coordinate crowding and pairwise distance distributions from 3D residue coordinates
-
-Internally, the code is split into:
-
-- [`src/tapemeasure/seq`](/Users/juand.sando/Documents/fv3_repositories/tapeseq-comp/src/tapemeasure/seq) for sequence workflows
-- [`src/tapemeasure/bulk`](/Users/juand.sando/Documents/fv3_repositories/tapeseq-comp/src/tapemeasure/bulk) for structure workflows
-- [`src/tapemeasure/shared`](/Users/juand.sando/Documents/fv3_repositories/tapeseq-comp/src/tapemeasure/shared) for shared run metadata/logging helpers
+- `tapeseq`: computes sequence self-similarity signals, detects periodicity with said signal, and assigns repeat-associated scores.
+- `tapebulk`: computes local coordinate crowding and pairwise distance distributions from 3D residue coordinates to determine different structural domains.
 
 ## Installation
-
-**Who This Is For**
-
-These instructions assume you are new to Python environments and just want a working install on your computer.
 
 **Prerequisite**
 
@@ -63,8 +38,7 @@ conda activate tapemeasure-analyze
 ```
 
 This creates one shared environment named `tapemeasure-analyze` containing everything needed for both `tapeseq` and `tapebulk`.
-
-The environment file also installs this repository in editable mode with `pip install -e .`, so changes in the repository are reflected in the installed commands without needing to reinstall from scratch every time.
+The environment file also installs this repository in editable mode with `pip install -e .`
 
 **Verify The Install**
 
@@ -86,12 +60,6 @@ pip install -e .
 hash -r
 ```
 
-Notes:
-
-- `conda env update ... --prune` adds new dependencies and removes old ones not listed anymore
-- `pip install -e .` refreshes the installed console entry points, including `tapebulk`
-- `hash -r` clears the shell command cache in `bash` so the terminal notices any updated command paths
-
 ## How Output Is Organized
 
 Both tools write results into an output directory you choose.
@@ -106,13 +74,9 @@ Analysis-specific outputs are written under `per_accession/` or `global_outputs/
 
 ## `tapeseq`
 
-`tapeseq` is the sequence-analysis side of the project.
-
-### Core Idea
-
 For each input sequence, `tapeseq` builds a self-similarity matrix using BLOSUM45 residue scores. It then smooths that matrix, converts it to a 1D signal by taking the row-wise maximum away from the diagonal, and standardizes that signal against shuffled versions of the same sequence. That standardized projection is the main signal reused by downstream sequence analyses.
 
-Full-sequence artifacts are cached by default in `.tapeseq_cache/` so repeated runs do not need to rebuild the same projections.
+Full-sequence artifacts are cached by default in `.tapeseq_cache/` so repeated runs with repeated runs not need to rebuild the same projections.
 
 ### General `tapeseq` Usage
 
@@ -138,50 +102,22 @@ tapeseq map-domain --help
 
 ### `tapeseq exploratory`
 
-Purpose:
 Write diagnostic outputs showing how each sequence behaves under the self-similarity projection workflow.
 
-What it does:
-
-1. Loads sequences from FASTA.
-2. Builds the full self-similarity matrix.
-3. Smooths the matrix iteratively.
-4. Computes the standardized projection from shuffled-sequence baselines.
-5. Writes heatmaps and projection plots.
+It builds a full smoothened self-similarity matrix that you can inspect via heatmaps to check whethere there are regions containing internally-conserved sequence repeats, seen as off-diagonal signal. It also  computes the standardized projection from shuffled-sequence baselines and writes heatmaps and projection plots.
 
 Typical command:
 
 ```bash
 tapeseq exploratory -i INPUT.fasta -o OUTPUT_DIR
-```
-
-Optional trimmed analysis:
-
-```bash
 tapeseq exploratory -i INPUT.fasta -o OUTPUT_DIR --trimmings TRIMS.csv
 ```
 
 If trimming rules are provided, the tool writes outputs for the trimmed windows instead of the full sequences.
 
-Typical outputs:
-
-- per-accession raw matrix heatmaps
-- per-accession smoothed matrix heatmaps
-- per-accession standardized projection plots
-- `global_outputs/trimmed_sequences.fasta` when trims are used
-
 ### `tapeseq periodicity`
 
-Purpose:
-Estimate whether the standardized sequence projection contains a dominant repeating period.
-
-What it does:
-
-1. Reuses the standardized projection from the full sequence or trimmed region.
-2. Runs an FFT on that 1D signal.
-3. Searches a configurable frequency window for the strongest peak.
-4. Converts that peak into an inferred period length.
-5. Slices the analyzed sequence into putative repeat segments using that inferred period.
+Estimate whether the standardized sequence projection contains a dominant repeating period. If exploratory mode has been run, it reuses the standardized projection. It then runs an FFT on that 1D signal, determines the domiannt frequency, and converts that peak into an inferred period length. It also slices the analyzed sequence into putative repeat segments using that inferred period, but please bear in mind these might not be perfect structural repeats and you should double check them before continuing the analysis.
 
 Typical command:
 
@@ -189,28 +125,9 @@ Typical command:
 tapeseq periodicity -i INPUT.fasta -o OUTPUT_DIR --trimmings TRIMS.csv
 ```
 
-Important interpretation note:
-The repeat segments written by this mode are putative repeats derived from FFT-estimated period lengths. They are meant as hypothesis-generating outputs, not validated biological repeat annotations.
-
-Typical outputs:
-
-- per-accession projection plots
-- per-accession FFT power plots
-- per-accession FASTA files of putative segments
-- `global_outputs/periodicity/results_summary.csv`
-- `global_outputs/periodicity/putative_repeats_all.fasta`
-
 ### `tapeseq repeat-analysis`
 
-Purpose:
-Score externally supplied repeats against the standardized projection of the full sequence.
-
-What it does:
-
-1. Loads full sequences from FASTA.
-2. Loads supplied repeat records from a repeat FASTA.
-3. Locates each repeat in the full sequence by exact match or local alignment fallback.
-4. Scores the located repeat window using the maximum value in the standardized projection over that interval.
+Score externally supplied repeats against the standardized projection of the full sequence. You can use the repeat sequences generated by `tapeseq periodicity`, but bear in mind these might not be perfect. The program will locates each repeat in the full sequence by exact match or local alignment fallback. Scores the located repeat window using the maximum z-value (representing the likelihood the repeat has internally-conserved sequence elements)  in the standardized projection over that interval.
 
 Typical command:
 
@@ -223,27 +140,15 @@ Repeat FASTA headers should follow this pattern:
 ```text
 ACCESSION_R1
 ACCESSION_R2
+...
 ACCESSION_RF
 ```
 
-Typical outputs:
-
-- per-accession repeat window score tables
-- `global_outputs/repeat_analysis/supplied_repeat_scores_summary.csv`
-
 ### `tapeseq map-domain`
 
-Purpose:
-Project a known domain from one aligned reference accession onto other aligned accessions and convert that mapping into conservative trimming rules.
+Project a known domain from one aligned reference accession onto other aligned accessions and convert that mapping into conservative trimming rules. It locates the reference domain inside the ungapped reference accession, converts that reference domain into alignment-column coordinates, and projects those columns onto every accession in the alignment.
 
-What it does:
-
-1. Loads an aligned FASTA.
-2. Locates the reference domain inside the ungapped reference accession.
-3. Converts that reference domain into alignment-column coordinates.
-4. Projects those columns onto every accession in the alignment.
-5. Emits accession-specific trimming rules only when the projected mapping is conservative enough.
-6. Records QC for all accessions, including partial or weak mappings.
+The program will generate accession-specific trimming rules only when the projected mapping is conservative enough and record QC for all accessions, including partial or weak mappings.
 
 Typical command:
 
@@ -255,14 +160,9 @@ tapeseq map-domain \
   --reference-domain DOMAIN.fasta
 ```
 
-Typical outputs:
-
-- `global_outputs/map_domain/mapped_domain_trimmings.csv`
-- `global_outputs/map_domain/mapped_domain_qc.csv`
-
 ### Trimming CSV Format
 
-For `exploratory` and `periodicity`, trimming rules must contain `start` and `end`, plus either `tmp_length` or `accession`.
+Likely, the entire tape measure does not have internally-repeated elements all through the sequence. You can focus the periodicity to a specific domain using `trimmings`. For `exploratory` and `periodicity`, trimming rules must contain `start` and `end`, plus either `tmp_length` or `accession`.
 
 Length-based example:
 
@@ -284,22 +184,22 @@ If both are present, accession-specific trimming rules take precedence.
 
 ## `tapebulk`
 
-`tapebulk` is the coordinate-analysis side of the project.
+Instead of looking at sequence self-similarity, `tapebulk` looks at where residues sit in 3D space. It can take either a coordinate CSV or an atomic model file in PDB or mmCIF format.
 
-### Core Idea
-
-Instead of looking at sequence self-similarity, `tapebulk` looks at where residues sit in 3D space. The current implementation expects a CSV containing one row per residue coordinate:
+When a model file is provided, the program uses the positions of C-alpha atoms to build the coordinate table used downstream. That table contains one row per residue and these columns:
 
 ```text
 Pos, Res, X, Y, Z
 ```
+
+The program requires the structure to contain exactly one protein chain. If more than one chain is detected, it warns the user and stops. For valid structure inputs, it writes `extracted_ca_coordinates.csv` and then uses that file as the input to the downstream bulk analysis.
 
 This can be used to ask whether some parts of a chain are locally crowded, locally expanded, or globally unusual in their pairwise distance distribution.
 
 ### General `tapebulk` Usage
 
 ```bash
-tapebulk MODE -i POINTS.csv -o OUTPUT_DIR [options]
+tapebulk MODE -i INPUT_FILE -o OUTPUT_DIR [options]
 ```
 
 Main modes:
@@ -316,17 +216,11 @@ tapebulk pairwise-histogram --help
 
 ### `tapebulk bulkiness`
 
-Purpose:
 Measure local spatial crowding along the chain.
 
-What it does:
+It loads residue coordinates either directly from a CSV or by extracting C-alpha positions from a PDB or mmCIF model. It then uses a KD-tree for efficient neighborhood queries, counts neighbors within one or more radii for every residue, optionally subtracts the expected neighbor count for a perfectly straight chain, and computes the mean distance to the first `k` nearest neighbors.
 
-1. Loads residue coordinates from CSV.
-2. Uses a KD-tree for efficient neighborhood queries.
-3. Counts neighbors within one or more radii for every residue.
-4. Optionally subtracts the expected neighbor count for a perfectly straight chain using a configurable residue spacing.
-5. Computes the mean distance to the first `k` nearest neighbors.
-6. Converts that mean nearest-neighbor distance into a simple crowding score:
+The program then converts that mean nearest-neighbor distance into a simple crowding score:
 
 ```text
 bulkiness score = 1 / (mean k-nearest-neighbor distance)^3
@@ -342,31 +236,30 @@ tapebulk bulkiness \
   --k-neighbors 10 \
   --subtract-baseline \
   --make-plots
+
+tapebulk bulkiness -i MODEL.pdb -o OUTPUT_DIR --radii 6 10 15 --k-neighbors 10
 ```
+
+If the input is a structure file, the extracted coordinate table is also written before the bulkiness analysis continues.
 
 Typical outputs:
 
+- `global_outputs/bulkiness/extracted_ca_coordinates.csv` when the input is a structure file
 - `global_outputs/bulkiness/bulkiness_table.csv`
 - `global_outputs/bulkiness/bulkiness_summary.json`
 - optional PNG plots for neighbor counts, extra crowding, and kNN bulkiness
 
 ### `tapebulk pairwise-histogram`
 
-Purpose:
 Summarize the global distance distribution of the coordinate set.
 
-What it does:
-
-1. Loads residue coordinates from CSV.
-2. Computes all pairwise Euclidean distances.
-3. Writes the distance list to CSV.
-4. Writes a histogram plot.
-5. Writes summary statistics as JSON.
+It loads residue coordinates from CSV, PDB, or mmCIF. For structure files it first extracts the `Pos,Res,X,Y,Z` C-alpha coordinate table. It then computes all pairwise Euclidean distances, writes the distance list to CSV, writes a histogram plot, and stores summary statistics as JSON.
 
 Typical command:
 
 ```bash
 tapebulk pairwise-histogram -i POINTS.csv -o OUTPUT_DIR --histogram-bins 40
+tapebulk pairwise-histogram -i MODEL.cif -o OUTPUT_DIR --histogram-bins 40
 ```
 
 Typical outputs:

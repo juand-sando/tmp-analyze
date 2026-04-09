@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from .analysis import compute_all_pairwise_distances, compute_bulkiness_measures, summarize_pairwise_distances
-from .io import load_points
+from .io import load_points_from_input
 from .models import BulkinessConfig
 from .outputs import analysis_dir, write_analysis_metadata, write_dataframe_csv, write_summary_json
 from .plotting import plot_bulkiness, plot_pairwise_distance_histogram
@@ -19,7 +19,13 @@ def run(config: BulkinessConfig) -> str:
 
 
 def run_bulkiness(config: BulkinessConfig) -> str:
-    points_dataframe = load_points(config.input_csv)
+    output_directory = analysis_dir(config.output_dir)
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    points_dataframe, input_kind = load_points_from_input(config.input_path)
+    if input_kind == "structure":
+        write_dataframe_csv(points_dataframe, output_directory / "extracted_ca_coordinates.csv")
+
     output_dataframe, summary = compute_bulkiness_measures(
         points_dataframe=points_dataframe,
         radii=config.radii,
@@ -28,8 +34,6 @@ def run_bulkiness(config: BulkinessConfig) -> str:
         baseline_spacing=config.baseline_spacing,
     )
 
-    output_directory = analysis_dir(config.output_dir)
-    output_directory.mkdir(parents=True, exist_ok=True)
     write_dataframe_csv(output_dataframe, output_directory / "bulkiness_table.csv")
     write_summary_json(summary, output_directory / "bulkiness_summary.json")
 
@@ -45,19 +49,23 @@ def run_bulkiness(config: BulkinessConfig) -> str:
         )
 
     return (
-        f"Done. Processed {len(points_dataframe)} coordinate(s); "
+        f"Done. Processed {len(points_dataframe)} coordinate(s) from {input_kind} input; "
         f"wrote bulkiness table and summary; "
         f"wrote {plot_count} plot(s)."
     )
 
 
 def run_pairwise_histogram(config: BulkinessConfig) -> str:
-    points_dataframe = load_points(config.input_csv)
+    output_directory = analysis_dir(config.output_dir)
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    points_dataframe, input_kind = load_points_from_input(config.input_path)
+    if input_kind == "structure":
+        write_dataframe_csv(points_dataframe, output_directory / "extracted_ca_coordinates.csv")
+
     all_pairwise_distances = compute_all_pairwise_distances(points_dataframe)
     summary = summarize_pairwise_distances(all_pairwise_distances, len(points_dataframe))
 
-    output_directory = analysis_dir(config.output_dir)
-    output_directory.mkdir(parents=True, exist_ok=True)
     write_dataframe_csv(
         pd.DataFrame({"pairwise_distance": all_pairwise_distances}),
         output_directory / "pairwise_distances.csv",
@@ -70,7 +78,7 @@ def run_pairwise_histogram(config: BulkinessConfig) -> str:
     )
 
     return (
-        f"Done. Processed {len(points_dataframe)} coordinate(s); "
+        f"Done. Processed {len(points_dataframe)} coordinate(s) from {input_kind} input; "
         f"computed {len(all_pairwise_distances)} pairwise distance(s); "
         f"wrote histogram outputs."
     )

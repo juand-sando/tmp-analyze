@@ -11,10 +11,12 @@ FORMATTER_CLASS = argparse.ArgumentDefaultsHelpFormatter
 def add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "-i",
+        "--input-file",
         "--input-csv",
-        dest="input_csv_flag",
-        metavar="INPUT_CSV",
-        help="CSV with columns Pos, Res, X, Y, Z.",
+        "--input-structure",
+        dest="input_path_flag",
+        metavar="INPUT_FILE",
+        help="Input CSV, PDB, or mmCIF file.",
     )
     parser.add_argument(
         "-o",
@@ -88,13 +90,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_input_output_args(parser: argparse.ArgumentParser, args) -> tuple[str, str]:
-    named_input = getattr(args, "input_csv_flag", None)
+    named_input = getattr(args, "input_path_flag", None)
     named_output = getattr(args, "output_dir_flag", None)
     legacy_input = getattr(args, "legacy_input_csv", None)
     legacy_output = getattr(args, "legacy_output_dir", None)
 
     if named_input is not None and legacy_input is not None:
-        parser.error("provide either --input-csv or the legacy positional input, not both.")
+        parser.error("provide either the named input flag or the legacy positional input, not both.")
     if named_output is not None and legacy_output is not None:
         parser.error("provide either --output-dir or the legacy positional output, not both.")
 
@@ -102,7 +104,7 @@ def resolve_input_output_args(parser: argparse.ArgumentParser, args) -> tuple[st
     output_value = named_output if named_output is not None else legacy_output
 
     if input_value is None or output_value is None:
-        parser.error("the following arguments are required: --input-csv, --output-dir")
+        parser.error("the following arguments are required: --input-file, --output-dir")
 
     return input_value, output_value
 
@@ -110,11 +112,11 @@ def resolve_input_output_args(parser: argparse.ArgumentParser, args) -> tuple[st
 def parse_args(argv: list[str] | None = None) -> BulkinessConfig:
     parser = build_parser()
     args = parser.parse_args(argv)
-    input_csv, output_dir = resolve_input_output_args(parser, args)
+    input_path, output_dir = resolve_input_output_args(parser, args)
 
     config = BulkinessConfig(
         mode=args.mode,
-        input_csv=input_csv,
+        input_path=input_path,
         output_dir=output_dir,
         radii=list(getattr(args, "radii", [10.0])),
         k_neighbors=getattr(args, "k_neighbors", 10),

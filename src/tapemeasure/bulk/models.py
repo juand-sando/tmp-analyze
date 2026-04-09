@@ -7,7 +7,7 @@ from pathlib import Path
 @dataclass
 class BulkinessConfig:
     mode: str
-    input_csv: Path
+    input_path: Path
     output_dir: Path
     radii: list[float] = field(default_factory=lambda: [10.0])
     k_neighbors: int = 10
