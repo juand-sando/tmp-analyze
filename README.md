@@ -1,6 +1,15 @@
-# tapeseq
+# tapemeasure-analyze
 
-`tapeseq` is a small command-line toolkit for sequence self-similarity analysis.
+This repository now installs two command-line tools for tape measure protein analysis:
+
+- `tapeseq`: sequence-focused self-similarity, periodicity, repeat, and domain-mapping analysis
+- `tapebulk`: structure-coordinate bulkiness and pairwise-distance analysis
+
+Both tools live in the same Python distribution and share the same installation.
+
+## `tapeseq`
+
+`tapeseq` is the sequence-analysis toolkit.
 
 All downstream analysis uses a standardized full-sequence projection computed from a reproducible shuffled baseline derived from the input sequence, accession, and master seed.
 
@@ -12,7 +21,7 @@ Each run also writes metadata under `output_dir/run_metadata/`, including:
 - `run.log`
 - `current_state.json`
 
-It currently exposes four modes:
+It exposes four modes:
 
 - `exploratory`: write raw and smoothed heatmaps plus projection plots for each accession
 - `periodicity`: run Fourier analysis on the full or trimmed focused window and write a periodicity summary
@@ -25,6 +34,8 @@ It currently exposes four modes:
 pip install -e .
 ```
 
+After updating an existing local install from this repo, run `pip install -e .` again so the new `tapebulk` console script is installed.
+
 ## Conda Environment
 
 From the repository root:
@@ -34,9 +45,9 @@ conda env create -f environment.yml
 conda activate tapeseq
 ```
 
-This installs the required packages and installs this repository in editable mode, so you can run `tapeseq` directly inside the conda environment.
+This installs the required packages and installs this repository in editable mode, so you can run both `tapeseq` and `tapebulk` inside the conda environment.
 
-## Commands
+## `tapeseq` Commands
 
 ```bash
 tapeseq exploratory -i INPUT.fasta -o OUTPUT_DIR --trimmings TRIMS.csv
@@ -53,6 +64,7 @@ Verify the environment with:
 
 ```bash
 tapeseq --help
+tapebulk --help
 ```
 
 ## Trimming CSV
@@ -90,4 +102,28 @@ You can also run the repository-local compatibility entrypoint:
 
 ```bash
 python3 unified_sequence_analysis.py --help
+```
+
+## `tapebulk`
+
+`tapebulk` is the structure-coordinate toolkit. It currently takes a CSV with columns `Pos`, `Res`, `X`, `Y`, `Z`.
+
+It exposes two modes:
+
+- `bulkiness`: neighbor counts, optional straight-chain baseline subtraction, and kNN-derived bulkiness scores
+- `pairwise-histogram`: all pairwise distances plus a histogram
+
+Example commands:
+
+```bash
+tapebulk bulkiness -i POINTS.csv -o OUTPUT_DIR --radii 6 10 15 --k-neighbors 10 --subtract-baseline --make-plots
+tapebulk pairwise-histogram -i POINTS.csv -o OUTPUT_DIR --histogram-bins 40
+```
+
+`tapebulk` writes its outputs under `OUTPUT_DIR/global_outputs/bulkiness/` plus the shared `run_metadata/` directory.
+
+The repository-local compatibility wrapper for the older standalone script is still available:
+
+```bash
+python3 bulkiness_v2.py --help
 ```

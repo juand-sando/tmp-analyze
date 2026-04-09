@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tapeseq"
 version = "0.1.0"
-description = "Sequence self-similarity, periodicity, and repeat analysis pipeline"
+description = "Tape measure sequence and structure analysis toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -13,10 +13,12 @@ dependencies = [
   "matplotlib>=3.7",
   "numpy>=1.24",
   "pandas>=2.0",
+  "scipy>=1.10",
 ]
 
 [project.scripts]
-tapeseq = "tapeseq.cli:main"
+tapeseq = "tapemeasure.seq.cli:main"
+tapebulk = "tapemeasure.bulk.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -1,4 +1,4 @@
-"""tapeseq package."""
+"""Compatibility package for the sequence toolkit."""
 
 __all__ = ["__version__"]
 

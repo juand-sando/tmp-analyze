@@ -10,7 +10,7 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from tapeseq.cli import main
+from tapemeasure.seq.cli import main
 
 
 if __name__ == "__main__":
